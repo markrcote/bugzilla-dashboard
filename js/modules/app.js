@@ -1,3 +1,169 @@
+const MS_PER_HOUR = 1000 * 60 * 60;
+const MS_PER_DAY =  MS_PER_HOUR * 24;
+const MS_PER_WEEK = MS_PER_DAY * 7;
+
+Require.modules["app/queries"] = function(exports, require) {
+  exports.open_blockers = function(username) {
+    return {
+      id: 'open_blockers',
+      name: 'Open blockers',
+      requires_user: false,
+      args: function() {
+        var a = {
+          field0_HYPH_0_HYPH_0: 'cf_blocking_20',
+          type0_HYPH_0_HYPH_1: 'substring',
+          field0_HYPH_0_HYPH_1: 'cf_blocking_20',
+          resolution: '---',
+          value0_HYPH_0_HYPH_1: 'final',
+          type0_HYPH_0_HYPH_0: 'substring',
+          value0_HYPH_0_HYPH_0: 'beta'
+        };
+        if (username) {
+          a.email1 = username;
+          a.email1_type = "equals";
+          a.email1_assigned_to = 1;
+        }
+        return a;
+      }
+    };
+  };
+  exports.open_noms = function(username) {
+    return {
+      id: 'open_noms',
+      name: 'Nominations',
+      requires_user: false,
+      args: function() {
+        var a = {
+          field0_HYPH_0_HYPH_0: 'cf_blocking_20',
+          type0_HYPH_0_HYPH_0: 'equals',
+          value0_HYPH_0_HYPH_0: '?',
+          resolution: '---'
+        };
+        if (username) {
+          a.email1 = username;
+          a.email1_type = "equals";
+          a.email1_assigned_to = 1;
+        }
+        return a;
+      }
+    };
+  };
+  exports.reviews = function(username) {
+    return {
+      id: 'reviews',
+      name: 'Requested reviews',
+      requires_user: true,
+      args: function() {
+        // username is mandatory
+        return {
+          status: ["NEW", "UNCONFIRMED", "ASSIGNED", "REOPENED"],
+          flag_DOT_requestee: username
+        };
+      }
+    };
+  };
+  exports.crashers = function(username) {
+    return {
+      id: 'crashers',
+      name: 'Crashers',
+      requires_user: false,
+      args: function() {
+        var a = {
+          field0_HYPH_0_HYPH_0: 'keywords',
+          type0_HYPH_0_HYPH_0: 'anywords',
+          value0_HYPH_0_HYPH_0: 'crash topcrash'
+        };
+        if (username) {
+          a.email1 = username;
+          a.email1_type = "equals";
+          a.email1_assigned_to = 1;
+        }
+        return a;
+      }
+    };
+  };
+  exports.security = function(username) {
+    return {
+      id: 'security',
+      name: 'Security',
+      requires_user: false,
+      args: function() {
+        var a = {
+          field0_HYPH_0_HYPH_0: 'component',
+          type0_HYPH_0_HYPH_1: 'allwordssubstr',
+          field0_HYPH_0_HYPH_1: 'status_whiteboard',
+          resolution: '---',
+          value0_HYPH_0_HYPH_1: '[sg:',
+          type0_HYPH_0_HYPH_0: 'equals',
+          value0_HYPH_0_HYPH_0: 'Security'
+        };
+        if (username) {
+          a.email1 = username;
+          a.email1_type = "equals";
+          a.email1_assigned_to = 1;
+        }
+        return a;
+      }
+    };
+  };
+  exports.blockers_fixed_30_days = function(username) {
+    return {
+      id: 'blockers_fixed_30_days',
+      name: 'Blockers fixed in the last 30 days',
+      requires_user: false,
+      args: function() {
+        var a = {
+          changed_field: 'resolution',
+          changed_field_to: 'FIXED',
+          changed_before: 'Now',
+          changed_after: require("date-utils").timeAgo(MS_PER_DAY * 30),
+          field0_HYPH_0_HYPH_0: 'cf_blocking_20',
+          type0_HYPH_0_HYPH_1: 'substring',
+          value0_HYPH_0_HYPH_1: 'beta',
+          type0_HYPH_0_HYPH_0: 'substring',
+          field0_HYPH_0_HYPH_1: 'cf_blocking_20',
+          value0_HYPH_0_HYPH_0: 'final',
+          resolution: 'FIXED'
+        };
+        if (username) {
+          a.email1 = username;
+          a.email1_type = "equals";
+          a.email1_assigned_to = 1;
+        }
+        return a;
+      }
+    };
+  };
+  exports.nonblockers_fixed_30_days = function(username) {
+    return {
+      id: 'nonblockers_fixed_30_days',
+      name: 'Nonblockers fixed in the last 30 days',
+      requires_user: false,
+      args: function() {
+        var a = {
+          changed_field: 'resolution',
+          changed_field_to: 'FIXED',
+          changed_before: 'Now',
+          changed_after: require("date-utils").timeAgo(MS_PER_DAY * 30),
+          field0_HYPH_0_HYPH_0: 'cf_blocking_20',
+          type0_HYPH_0_HYPH_0: 'notsubstring',
+          value0_HYPH_0_HYPH_0: 'final',
+          field0_HYPH_1_HYPH_0: 'cf_blocking_20',
+          type0_HYPH_1_HYPH_0: 'notsubstring',
+          value0_HYPH_1_HYPH_0: 'beta',
+          resolution: 'FIXED'
+        };
+        if (username) {
+          a.email1 = username;
+          a.email1_type = "equals";
+          a.email1_assigned_to = 1;
+        }
+        return a;
+      }
+    };
+  };
+};
+
 Require.modules["app/loader"] = function(exports, require) {
   exports.init = function init(moduleExports, options) {
     var cache;
@@ -17,14 +183,36 @@ Require.modules["app/loader"] = function(exports, require) {
     moduleExports.jQuery = options.jQuery;
 
     require("app/ui").init(options.window.document);
+    require("app/login").init();
   };
 };
 
-Require.modules["app/login"] = function(exports) {
+Require.modules["app/who"] = function(exports, require) {
+  var callbacks = [];
+  var who = "";
+
+  exports.get = function get() {
+    return who;
+  }
+
+  exports.whenChanged = function whenChanged(cb) {
+    callbacks.push(cb);
+  };
+
+  exports.set = function set(username) {
+    who = username;
+    console.log('who is now ' + who);
+
+    callbacks.forEach(function(cb) { cb(who); });
+  }
+};
+
+Require.modules["app/login"] = function(exports, require) {
   var callbacks = [];
   var username;
   var password;
   var passwordProvider;
+  var cache = require("cache");
 
   exports.setPasswordProvider = function setPasswordProvider(pp) {
     passwordProvider = pp;
@@ -35,6 +223,10 @@ Require.modules["app/login"] = function(exports) {
   };
 
   exports.get = function get() {
+    if (username === undefined)
+      username = "";
+    if (password === undefined)
+      password = "";
     var isLoggedIn = (username && username != "");
     var isAuthenticated = (isLoggedIn && password && password != "");
 
@@ -47,21 +239,41 @@ Require.modules["app/login"] = function(exports) {
   };
 
   exports.set = function set(newUsername, newPassword) {
+    console.log("app/login/set: " + newUsername + " " + newPassword);
+    console.log("current info:");
+    console.dir(exports.get());
     if ((newUsername && newUsername != "") &&
         (!newPassword || newPassword == "") &&
         (passwordProvider))
       newPassword = passwordProvider(newUsername);
 
-    if (newUsername == username && newPassword == password)
+    if ((newUsername && newUsername == username) &&
+        (newPassword && newPassword == password))
+    {
+      console.log("same username and password");
       return;
+    }
 
     username = newUsername;
     password = newPassword;
+
+    cache.set('username', username);
+    cache.set('password', password);
+
+    $("#username").text(username);
 
     var info = exports.get();
 
     callbacks.forEach(function(cb) { cb(info); });
   };
+  
+  exports.init = function init() {
+    var cachedUsername = cache.get("username");
+    var cachedPassword = cache.get("password");
+    console.log("cached username: " + cachedUsername);
+    console.log("cached password: " + cachedPassword);
+    exports.set(cachedUsername, cachedPassword);
+  }
 };
 
 Require.modules["app/errors"] = function(exports, require) {
@@ -100,7 +312,15 @@ Require.modules["app/bugzilla-auth"] = function(exports, require) {
     var xhr = event.target;
     var response = JSON.parse(xhr.responseText);
     if (response.error)
-      require("app/errors").log("bugzilla-api-error");
+    {
+      console.log('error!');
+      console.dir(response);
+      if (response.code == 300) {
+        require("app/errors").log("bugzilla-auth-error");
+      } else {
+        require("app/errors").log("bugzilla-api-error");
+      }
+    }
   }
 
   exports.create = function(Bugzilla) {
@@ -177,84 +397,6 @@ Require.modules["app/ui/login-form"] = function(exports, require) {
   };
 };
 
-Require.modules["app/ui/file-bug"] = function(exports, require) {
-  const EM_DASH = "\u2014";
-
-  var $ = require("jQuery");
-  var cache = require("cache");
-  var bugzilla = require("bugzilla");
-  var window = require("window");
-  var config = cache.get("configuration");
-  var needToFetchConfig = config ? false : true;
-  var categories;
-  var queuedRespond;
-
-  function buildCategories() {
-    categories = [];
-    for (product in config.product)
-      for (component in config.product[product].component)
-        categories.push(product + EM_DASH + component);
-  }
-
-  function fetchConfig() {
-    bugzilla.ajax({url: "/configuration",
-                   data: {flags: 0},
-                   success: function(result) {
-                     config = result;
-                     cache.set("configuration", result);
-                     if (queuedRespond)
-                       queuedRespond();
-                   }});
-  }
-
-  var categoryOptions = {
-    minLength: 2,
-    source: function(request, response) {
-      function respond() {
-        queuedRespond = null;
-
-        var suggs = [];
-        var terms = request.term.split(" ");
-
-        if (!categories)
-          buildCategories();
-
-        categories.forEach(
-          function(category) {
-            for (var i = 0; i < terms.length; i++)
-              if (!category.match(terms[i], "i"))
-                return;
-            suggs.push(category);
-          });
-
-        response(suggs);
-      };
-
-      if (!config) {
-        queuedRespond = respond;
-        if (needToFetchConfig) {
-          needToFetchConfig = false;
-          fetchConfig();
-        }
-      } else
-        respond();
-    }
-  };
-
-  $("#file-bug .category").autocomplete(categoryOptions);
-  $("#file-bug").submit(
-    function(event) {
-      event.preventDefault();
-      var parts = $("#file-bug .category").val().split(EM_DASH);
-      window.open(bugzilla.BASE_UI_URL + "/enter_bug.cgi?" +
-                  "product=" + escape(parts[0]) + "&" +
-                  "component=" + escape(parts[1]));
-    });
-
-  exports.init = function init() {
-  };
-};
-
 Require.modules["app/ui/repair"] = function(exports, require) {
   var $ = require("jQuery");
 
@@ -303,7 +445,8 @@ Require.modules["app/ui/find-user"] = function(exports, require) {
     }
   };
 
-  $("#find-user .query").autocomplete(options);
+  if (require("app/login").isAuthenticated)
+    $("#find-user .query").autocomplete(options);
   $("#find-user form").submit(
     function(event) {
       event.preventDefault();
@@ -329,6 +472,11 @@ Require.modules["app/ui"] = function(exports, require) {
         "no-auth-login": false
       };
 
+      console.log("app/login/whenChanged/changeUI called");
+      console.log("username: " + user.username);
+      console.log("user.isLoggedIn: " + user.isLoggedIn);
+      console.log("user.isAuthenticated: " + user.isAuthenticated);
+
       if (user.isLoggedIn) {
         show["login"] = true;
         if (user.isAuthenticated)
@@ -336,7 +484,7 @@ Require.modules["app/ui"] = function(exports, require) {
         else {
           show["no-auth"] = true;
           show["no-auth-login"] = true;
-        }
+        } 
       } else {
         show["no-login"] = true;
         show["no-auth"] = true;
@@ -379,12 +527,12 @@ Require.modules["app/ui"] = function(exports, require) {
   function setupDocumentTitleChanger(document) {
     const BASE_TITLE = document.title;
 
-    require("app/login").whenChanged(
-      function changeTitle(user) {
+    require("app/who").whenChanged(
+      function changeTitle(username) {
         var title = BASE_TITLE;
 
-        if (user.isLoggedIn)
-          title = user.username + "'s " + BASE_TITLE;
+        if (username)
+          title = username + "'s " + BASE_TITLE;
 
         if (document.title != title) {
           document.title = title;
@@ -410,11 +558,10 @@ Require.modules["app/ui"] = function(exports, require) {
     require("app/ui/dashboard").init();
     require("app/ui/login-form").init();
     require("app/ui/find-user").init();
-    require("app/ui/file-bug").init();
     require("app/ui/hash").init(document);
 
-    if (!require("app/login").get().isLoggedIn)
-      openDialog("login");
+    //if (!require("app/login").get().isLoggedIn)
+    //  openDialog("login");
   };
 };
 
@@ -426,6 +573,11 @@ Require.modules["app/ui/hash"] = function(exports, require) {
         return unescape(match[1]);
     }
     return "";
+  }
+
+  function setWhoFromHash(location) {
+      var who = usernameFromHash(location);
+      require("app/who").set(who);
   }
 
   function setLoginFromHash(location) {
@@ -443,18 +595,21 @@ Require.modules["app/ui/hash"] = function(exports, require) {
   exports.init = function init(document) {
     require("app/login").whenChanged(
       function(user) {
+      /*
         if (user.isLoggedIn) {
           var hash = exports.usernameToHash(user.username);
           if (document.location.hash != hash)
             document.location.hash = hash;
         } else
           document.location.hash = "";
+      */
       });
 
     var window = document.defaultView;
 
     function onHashChange() {
-      setLoginFromHash(document.location);
+      //setLoginFromHash(document.location);
+      setWhoFromHash(document.location);
     }
 
     if ("onhashchange" in window)
@@ -593,7 +748,45 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       });
   }
 
-  function report(selector, key, forceUpdate, searchTerms) {
+  function showStats(entry, bug_count) {
+    entry.find(".value").text(bug_count);
+  }
+
+  function quickstats(selector, key, forceUpdate, query, args) {
+    var entry = $("#templates .statsentry").clone();
+    entry.find(".name").text(query.name);
+    entry.find(".value").text("...");
+    $(selector).append(entry);
+
+    var newTerms = {};
+    for (name in args)
+      newTerms[name.replace(/_DOT_/g, ".").replace(/_HYPH_/g, "-")] = args[name];
+
+    var cacheKey = key + "/" + selector + query.id;
+    var cached = cache.get(cacheKey);
+    if (cached) {
+      console.log('got cached');
+      showStats($(entry), cached);
+      if (!forceUpdate)
+        return;
+    }
+
+    //$(selector).find("h2").addClass("loading");
+    entry.find(".value").addClass("loading");
+    
+    xhrQueue.enqueue(
+      function() {
+        return bugzilla.count(
+          newTerms,
+          function(response) {
+            cache.set(cacheKey, response.data);
+            showStats($(entry), response.data);
+            entry.find(".value").removeClass("loading");
+          });
+      });
+  }
+
+  function report(selector, key, forceUpdate, searchTerms, queries) {
     var newTerms = {__proto__: defaults};
     for (name in searchTerms)
       newTerms[name.replace(/_DOT_/g, ".")] = searchTerms[name];
@@ -620,19 +813,52 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       });
   }
 
-  const MS_PER_HOUR = 1000 * 60 * 60;
-  const MS_PER_DAY =  MS_PER_HOUR * 24;
-  const MS_PER_WEEK = MS_PER_DAY * 7;
-
   var defaults = {
     changed_after: dateUtils.timeAgo(MS_PER_WEEK * 14)
   };
 
+  function allQuickStats(myUsername, isAuthenticated, forceUpdate) {
+    var key = myUsername + "_" + (isAuthenticated ? "PRIVATE" : "PUBLIC");
+
+    for (q in require("app/queries")) {
+      var query = require("app/queries")[q](myUsername);
+      if (query.requires_user && !myUsername)
+      {
+        console.log("skipping");
+        continue;
+      }
+      quickstats("#quickstats", key, forceUpdate, query, query.args());
+    }
+  }
+
   function update(myUsername, isAuthenticated, forceUpdate) {
     xhrQueue.clear();
 
-    var key = myUsername + "_" + (isAuthenticated ? "PRIVATE" : "PUBLIC");
+    $("#quickstats").html("");
 
+    console.log("who: [" + myUsername + "]");
+
+    if (myUsername) {
+      $("#quickstats").find("h2").addClass("loading");
+      xhrQueue.enqueue(
+        function() {
+          return bugzilla.user(
+            myUsername,
+            function(response) {
+              $("#quickstats").find("h2").removeClass("loading");
+              allQuickStats(myUsername, isAuthenticated, forceUpdate);
+            },
+            function(response) {
+              $("#quickstats").find("h2").removeClass("loading");
+              $("#quickstats").text("No such user exists!");
+            });
+        });
+    } else {
+      allQuickStats(myUsername, isAuthenticated, forceUpdate);
+    }
+
+
+/*   
     report("#code-reviews", key, forceUpdate,
            {status: ["NEW", "UNCONFIRMED", "ASSIGNED", "REOPENED"],
             flag_DOT_requestee: myUsername});
@@ -670,24 +896,51 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
             email1_assigned_to: 1,
             email1_reporter: 1,
             email1_cc: 1});
+*/
   };
 
   var refreshCommand = {
     name: "refresh-dashboard",
     execute: function execute() {
       var user = require("app/login").get();
-      if (user.isLoggedIn)
-        update(user.username, user.isAuthenticated, true);
+      var who = require("app/who").get();
+      update(who, user.isAuthenticated, true);
+    }
+  };
+  
+  var logoutCommand = {
+    name: "logout",
+    execute: function execute() {
+      console.log('foo');
+      require("app/login").set("", "");
+      console.log('foo2');
+      var who = require("app/who").get();
+      update(who, false, true);
+    }
+  };
+
+  var myStatsCommand = {
+    name: "mystats",
+    execute: function execute() {
+      var user = require("app/login").get();
+      require("app/who").set(user.username);
     }
   };
 
   exports.init = function init() {
     require("app/commands").register(refreshCommand);
+    require("app/commands").register(logoutCommand);
+    require("app/commands").register(myStatsCommand);
+    require("app/who").whenChanged(
+      function changeSearchCriteria(username) {
+        var user = require("app/login").get();
+        var who = require("app/who").get();
+        update(who, user.isAuthenticated, false);
+      });
     require("app/login").whenChanged(
-      function changeSearchCriteria(user) {
-        if (user.isLoggedIn) {
-          update(user.username, user.isAuthenticated, false);
-        }
+      function changeUser(user) {
+        var who = require("app/who").get();
+        update(who, user.isAuthenticated, false);
       });
   };
 };

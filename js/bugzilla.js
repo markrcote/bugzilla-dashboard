@@ -28,10 +28,15 @@ var Bugzilla = {
 
     function onLoad() {
       var response = JSON.parse(xhr.responseText);
+      console.log('got response');
       if (!response.error)
         options.success(response);
       // TODO: We should really call some kind of error callback
       // if this didn't work.
+    }
+
+    function onErr() {
+      options.fail();
     }
 
     var xhr = options.xhr ? options.xhr : new XMLHttpRequest();
@@ -43,6 +48,8 @@ var Bugzilla = {
     xhr.setRequestHeader("Accept", "application/json");
     xhr.setRequestHeader("Content-Type", "application/json");
     xhr.addEventListener("load", onLoad, false);
+    if (options.fail)
+      xhr.addEventListener("error", onErr, false);
     xhr.send(null);
     return xhr;
   },
@@ -54,5 +61,16 @@ var Bugzilla = {
     return this.ajax({url: "/bug",
                       data: query,
                       success: cb});
+  },
+  count: function Bugzilla_count(query, cb) {
+    return this.ajax({url: "/count",
+                      data: query,
+                      success: cb});
+  },
+  user: function Bugzilla_user(userid, cb, errcb) {
+    return this.ajax({url: "/user/" + userid,
+                      data: {},
+                      success: cb,
+                      fail: errcb});
   }
 };

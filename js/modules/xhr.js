@@ -20,6 +20,9 @@ Require.modules["xhr/queue"] = function(exports, require) {
 
     function onDone(event) {
       var xhr = event.target;
+      console.log("onDone");
+      console.log("responseText: " + xhr.responseText);
+      console.dir(event);
       EVENTS.forEach(function(name) {
         xhr.removeEventListener(name, onDone, false);
       });
