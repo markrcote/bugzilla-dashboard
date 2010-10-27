@@ -213,3 +213,7 @@ div.more-link {
 div.more-link:hover {
     background: #f0f0f0;
 }
+
+.teamlink {
+  cursor: pointer;
+}

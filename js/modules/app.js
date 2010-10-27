@@ -87,6 +87,21 @@ Require.modules["app/queries"] = function(exports, require) {
       }
     };
   };
+  exports.awaiting_reviews = function(username) {
+    return {
+      id: 'awaiting_reviews',
+      name: 'Awaiting review',
+      requires_user: true,
+      args: function() {
+        return {
+          field0_HYPH_0_HYPH_0: "flag.requestee",
+          type0_HYPH_0_HYPH_0: "substring",
+          value0_HYPH_0_HYPH_0: username,
+          resolution: "---"
+        };
+      }
+    };
+  };
   exports.crashers = function(username) {
     return {
       id: 'crashers',
@@ -230,7 +245,6 @@ Require.modules["app/who"] = function(exports, require) {
   exports.set = function set(username, groupname) {
     who.user = username;
     who.group = groupname;
-    //console.log('who is now ' + who);
 
     callbacks.forEach(function(cb) { cb(who); });
   }
@@ -268,9 +282,6 @@ Require.modules["app/login"] = function(exports, require) {
   };
 
   exports.set = function set(newUsername, newPassword) {
-    //console.log("app/login/set: " + newUsername + " " + newPassword);
-    //console.log("current info:");
-    //console.dir(exports.get());
     if ((newUsername && newUsername != "") &&
         (!newPassword || newPassword == "") &&
         (passwordProvider))
@@ -278,10 +289,7 @@ Require.modules["app/login"] = function(exports, require) {
 
     if ((newUsername && newUsername == username) &&
         (newPassword && newPassword == password))
-    {
-      //console.log("same username and password");
       return;
-    }
 
     username = newUsername;
     password = newPassword;
@@ -299,8 +307,6 @@ Require.modules["app/login"] = function(exports, require) {
   exports.init = function init() {
     var cachedUsername = cache.get("username");
     var cachedPassword = cache.get("password");
-    //console.log("cached username: " + cachedUsername);
-    //console.log("cached password: " + cachedPassword);
     exports.set(cachedUsername, cachedPassword);
   }
 };
@@ -342,8 +348,6 @@ Require.modules["app/bugzilla-auth"] = function(exports, require) {
     var response = JSON.parse(xhr.responseText);
     if (response.error)
     {
-      //console.log('error!');
-      //console.dir(response);
       if (response.code == 300) {
         require("app/errors").log("bugzilla-auth-error");
       } else {
@@ -503,11 +507,6 @@ Require.modules["app/ui"] = function(exports, require) {
         "no-auth-login": false
       };
 
-      //console.log("app/login/whenChanged/changeUI called");
-      //console.log("username: " + user.username);
-      //console.log("user.isLoggedIn: " + user.isLoggedIn);
-      //console.log("user.isAuthenticated: " + user.isAuthenticated);
-
       if (user.isLoggedIn) {
         show["login"] = true;
         if (user.isAuthenticated)
@@ -564,8 +563,8 @@ Require.modules["app/ui"] = function(exports, require) {
       function changeTitle(who) {
         var title = BASE_TITLE;
 
-        if (who.username)
-          title = who.username + "'s " + BASE_TITLE;
+        if (who.user)
+          title = who.user + "'s " + BASE_TITLE;
         else if (who.group)
           title = who.group + "'s " + BASE_TITLE;
 
@@ -685,14 +684,11 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
 
   function getUserStat(username, isAuthenticated, forceUpdate, query, getUserStatCb) {
     var cacheKey = username + "_" + (isAuthenticated ? "PRIVATE" : "PUBLIC") + "/" + query.id;
-    var cached = cache.get(cacheKey);
-    //console.log("looking for cache for " + cacheKey);
-    if (cached) {
-      //console.log("got cache");
+    if (cache.haskey(cacheKey)) {
+      var cached = cache.get(cacheKey);
       getUserStatCb(username, query, cached);
       return;
     }
-    //console.log("no cache");
 
     var newTerms = {};
     for (name in query.args())
@@ -735,15 +731,12 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     );
   }
 
-  function allQuickStats(myUsername, isAuthenticated, forceUpdate) {
+  function allQuickStats(selector, myUsername, isAuthenticated, forceUpdate) {
     for (q in require("app/queries")) {
       var query = require("app/queries")[q](myUsername);
       if (query.requires_user && !myUsername)
-      {
-        //console.log("skipping");
         continue;
-      }
-      displayQuickstats("#quickstats", myUsername, isAuthenticated, forceUpdate, query);
+      displayQuickstats(selector, myUsername, isAuthenticated, forceUpdate, query);
     }
   }
 
@@ -757,10 +750,12 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     
     var totalsRow = rowTemplate.clone();
     totalsRow.find(".name").text("Totals");
+    totalsRow.find(".stats-cell").addClass("loading");
     var totalsStatsCell = totalsRow.find(".stats-cell");
     table.append(totalsRow);
 
     if (!includeMembers) {
+       totalsRow.addClass("teamlink");
        totalsRow.click(
         function onClick() {
           var url = require("app/ui/hash").groupnameToHash(teamId);
@@ -777,11 +772,15 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       entry.attr("id", entryId);
       totalsStatsCell.append(entry);
     }
+
+    var numQueries = 0;
     
     function statsCb(username, query, value) {
       var entryId = "total" + query.id;
       var entry = totalsStatsCell.find('#' + entryId);
       incrStats(entry, value);
+      if (--numQueries == 0)
+        totalsRow.find(".stats-cell").removeClass("loading");
     }
     
     for (m in team.members) {
@@ -791,6 +790,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         table.append(row);
       }
       for (q in require("app/queries")) {
+        ++numQueries;
         var query = require("app/queries")[q](team.members[m]);
         if (includeMembers)
           displayQuickstats(row.find(".stats-cell"), team.members[m], isAuthenticated, forceUpdate, query, statsCb);
@@ -800,32 +800,32 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     }
   }
 
-  function teamList(isAuthenticated, forceUpdate) {
+  function teamList(selector, isAuthenticated, forceUpdate) {
     var teams = require("app/teams").get();
     for (t in teams) {
-      teamStats("#quickstats", t, isAuthenticated, forceUpdate, false);
+      teamStats(selector, t, isAuthenticated, forceUpdate, false);
     }
   }
 
-  function userStats(username, isAuthenticated, forceUpdate) {
+  function userStats(selector, username, isAuthenticated, forceUpdate) {
     if (username) {
-      $("#quickstats").find("h2").addClass("loading");
+      $(selector).find("h2").addClass("loading");
       xhrQueue.enqueue(
         function() {
           return bugzilla.user(
             username,
             function(response) {
-              $("#quickstats").find("h2").removeClass("loading");
-              allQuickStats(username, isAuthenticated, forceUpdate);
+              $(selector).find("h2").removeClass("loading");
+              allQuickStats(selector, username, isAuthenticated, forceUpdate);
             },
             function(response) {
-              $("#quickstats").find("h2").removeClass("loading");
-              $("#quickstats").text("No such user exists!");
+              $(selector).find("h2").removeClass("loading");
+              $(selector).text("No such user exists!");
             });
         });
     } else {
-      allQuickStats(username, isAuthenticated, forceUpdate);
-      teamList(isAuthenticated, forceUpdate);
+      allQuickStats(selector, username, isAuthenticated, forceUpdate);
+      teamList(selector, isAuthenticated, forceUpdate);
     }
   }
 
@@ -837,7 +837,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     if (who.group)
       teamStats("#quickstats", who.group, isAuthenticated, forceUpdate, true);
     else
-      userStats(who.user, isAuthenticated, forceUpdate);
+      userStats("#quickstats", who.user, isAuthenticated, forceUpdate);
   };
 
   var refreshCommand = {
@@ -852,9 +852,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
   var logoutCommand = {
     name: "logout",
     execute: function execute() {
-      //console.log('foo');
       require("app/login").set("", "");
-      //console.log('foo2');
       var who = require("app/who").get();
       update(who, false, true);
     }
@@ -864,7 +862,8 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     name: "mystats",
     execute: function execute() {
       var user = require("app/login").get();
-      require("app/who").set(user.username);
+      var url = require("app/ui/hash").usernameToHash(user.username);
+      window.open(url);
     }
   };
 

@@ -28,6 +28,10 @@ Require.modules["cache/html5"] = function(exports, require) {
       clear: function clear() {
         storage.removeItem(name);
         cache = {};
+      },
+      
+      haskey: function haskey(key) {
+        return key in cache;
       }
     };
   };
