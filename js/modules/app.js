@@ -36,12 +36,12 @@ Require.modules["app/queries"] = function(exports, require) {
       args: function() {
         var a = {
           field0_HYPH_0_HYPH_0: 'cf_blocking_20',
-          type0_HYPH_0_HYPH_1: 'substring',
-          field0_HYPH_0_HYPH_1: 'cf_blocking_20',
-          resolution: '---',
-          value0_HYPH_0_HYPH_1: 'final',
           type0_HYPH_0_HYPH_0: 'substring',
-          value0_HYPH_0_HYPH_0: 'beta'
+          value0_HYPH_0_HYPH_0: 'beta',
+          field0_HYPH_0_HYPH_1: 'cf_blocking_20',
+          type0_HYPH_0_HYPH_1: 'substring',
+          value0_HYPH_0_HYPH_1: 'final',
+          resolution: '---'
         };
         if (username) {
           a.email1 = username;
@@ -73,24 +73,29 @@ Require.modules["app/queries"] = function(exports, require) {
       }
     };
   };
-  exports.reviews = function(username) {
+  exports.patches_awaiting_review = function(username) {
     return {
-      id: 'reviews',
-      name: 'Requested reviews',
+      id: 'patches_awaiting_review',
+      name: 'Patches awaiting review',
       requires_user: true,
       args: function() {
         // username is mandatory
         return {
-          status: ["NEW", "UNCONFIRMED", "ASSIGNED", "REOPENED"],
-          flag_DOT_requestee: username
+          type0_HYPH_1_HYPH_0: "substring",
+          field0_HYPH_1_HYPH_0: "flagtypes.name",
+          field0_HYPH_0_HYPH_0: "setters.login_name",
+          resolution: "---",
+          value0_HYPH_1_HYPH_0: "review?",
+          type0_HYPH_0_HYPH_0: "substring",
+          value0_HYPH_0_HYPH_0: username
         };
       }
     };
   };
-  exports.awaiting_reviews = function(username) {
+  exports.review_queue = function(username) {
     return {
-      id: 'awaiting_reviews',
-      name: 'Awaiting review',
+      id: 'review_queue',
+      name: 'Review queue',
       requires_user: true,
       args: function() {
         return {
