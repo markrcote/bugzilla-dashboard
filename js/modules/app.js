@@ -878,11 +878,19 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       window.open(url);
     }
   };
+  
+  var topCommand = {
+    name: "top-page",
+    execute: function execute() {
+      window.open("/");  
+    }
+  };
 
   exports.init = function init() {
     require("app/commands").register(refreshCommand);
     require("app/commands").register(logoutCommand);
     require("app/commands").register(myStatsCommand);
+    require("app/commands").register(topCommand);
     require("app/who").whenChanged(
       function changeSearchCriteria(username) {
         var user = require("app/login").get();
