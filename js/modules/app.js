@@ -2,6 +2,25 @@ const MS_PER_HOUR = 1000 * 60 * 60;
 const MS_PER_DAY =  MS_PER_HOUR * 24;
 const MS_PER_WEEK = MS_PER_DAY * 7;
 
+Require.modules["app/teams"] = function(exports) {
+  var teams = {
+    ateam: {
+      name: "Tools and Automation",
+      members: [
+        "mcote@mozilla.com",
+        "ctalbert@mozilla.com",
+        "fayearthur+bugs@gmail.com",
+        "jhammel@mozilla.com",
+        "jgriffin@mozilla.com"
+      ]
+    }
+  };
+
+  exports.get = function get() {
+    return teams;
+  };
+};
+
 Require.modules["app/queries"] = function(exports, require) {
   exports.open_blockers = function(username) {
     return {
@@ -201,7 +220,7 @@ Require.modules["app/who"] = function(exports, require) {
 
   exports.set = function set(username) {
     who = username;
-    console.log('who is now ' + who);
+    //console.log('who is now ' + who);
 
     callbacks.forEach(function(cb) { cb(who); });
   }
@@ -239,9 +258,9 @@ Require.modules["app/login"] = function(exports, require) {
   };
 
   exports.set = function set(newUsername, newPassword) {
-    console.log("app/login/set: " + newUsername + " " + newPassword);
-    console.log("current info:");
-    console.dir(exports.get());
+    //console.log("app/login/set: " + newUsername + " " + newPassword);
+    //console.log("current info:");
+    //console.dir(exports.get());
     if ((newUsername && newUsername != "") &&
         (!newPassword || newPassword == "") &&
         (passwordProvider))
@@ -250,7 +269,7 @@ Require.modules["app/login"] = function(exports, require) {
     if ((newUsername && newUsername == username) &&
         (newPassword && newPassword == password))
     {
-      console.log("same username and password");
+      //console.log("same username and password");
       return;
     }
 
@@ -270,8 +289,8 @@ Require.modules["app/login"] = function(exports, require) {
   exports.init = function init() {
     var cachedUsername = cache.get("username");
     var cachedPassword = cache.get("password");
-    console.log("cached username: " + cachedUsername);
-    console.log("cached password: " + cachedPassword);
+    //console.log("cached username: " + cachedUsername);
+    //console.log("cached password: " + cachedPassword);
     exports.set(cachedUsername, cachedPassword);
   }
 };
@@ -313,8 +332,8 @@ Require.modules["app/bugzilla-auth"] = function(exports, require) {
     var response = JSON.parse(xhr.responseText);
     if (response.error)
     {
-      console.log('error!');
-      console.dir(response);
+      //console.log('error!');
+      //console.dir(response);
       if (response.code == 300) {
         require("app/errors").log("bugzilla-auth-error");
       } else {
@@ -427,6 +446,8 @@ Require.modules["app/ui/find-user"] = function(exports, require) {
     minLength: 2,
     delay: 1000,
     source: function(request, response) {
+      if (!require("app/login").get().isAuthenticated)
+        return;
       function success(result) {
         currReq = null;
         var suggs = [];
@@ -445,8 +466,8 @@ Require.modules["app/ui/find-user"] = function(exports, require) {
     }
   };
 
-  if (require("app/login").isAuthenticated)
-    $("#find-user .query").autocomplete(options);
+  $("#find-user .query").autocomplete(options);
+    
   $("#find-user form").submit(
     function(event) {
       event.preventDefault();
@@ -472,10 +493,10 @@ Require.modules["app/ui"] = function(exports, require) {
         "no-auth-login": false
       };
 
-      console.log("app/login/whenChanged/changeUI called");
-      console.log("username: " + user.username);
-      console.log("user.isLoggedIn: " + user.isLoggedIn);
-      console.log("user.isAuthenticated: " + user.isAuthenticated);
+      //console.log("app/login/whenChanged/changeUI called");
+      //console.log("username: " + user.username);
+      //console.log("user.isLoggedIn: " + user.isLoggedIn);
+      //console.log("user.isAuthenticated: " + user.isAuthenticated);
 
       if (user.isLoggedIn) {
         show["login"] = true;
@@ -507,6 +528,8 @@ Require.modules["app/ui"] = function(exports, require) {
       } else
         openDialog(this.getAttribute("data-dialog"));
     });
+
+  // FIXME: Set up clickable (drill-down) commands
 
   $(".dialog").click(
     function dismissDialogOnOutsideClick(event) {
@@ -580,14 +603,6 @@ Require.modules["app/ui/hash"] = function(exports, require) {
       require("app/who").set(who);
   }
 
-  function setLoginFromHash(location) {
-    var username = usernameFromHash(location);
-
-    var user = require("app/login").get();
-    if (user.username != username)
-      require("app/login").set(username);
-  }
-
   exports.usernameToHash = function usernameToHash(username) {
     return "#username=" + escape(username);
   };
@@ -608,7 +623,6 @@ Require.modules["app/ui/hash"] = function(exports, require) {
     var window = document.defaultView;
 
     function onHashChange() {
-      //setLoginFromHash(document.location);
       setWhoFromHash(document.location);
     }
 
@@ -751,92 +765,141 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
   function showStats(entry, bug_count) {
     entry.find(".value").text(bug_count);
   }
+  
+  function incrStats(entry, bug_count) {
+    var totalCount = 0;
+    var curCount = parseInt(entry.find(".value").text());
+    if (isNaN(curCount))
+      curCount = bug_count;
+    else
+      curCount += bug_count;
+    entry.find(".value").text(curCount);
+  }
 
-  function quickstats(selector, key, forceUpdate, query, args) {
-    var entry = $("#templates .statsentry").clone();
-    entry.find(".name").text(query.name);
-    entry.find(".value").text("...");
-    $(selector).append(entry);
+  function getUserStat(username, isAuthenticated, forceUpdate, query, getUserStatCb) {
+    var cacheKey = username + "_" + (isAuthenticated ? "PRIVATE" : "PUBLIC") + "/" + query.id;
+    var cached = cache.get(cacheKey);
+    //console.log("looking for cache for " + cacheKey);
+    if (cached) {
+      //console.log("got cache");
+      getUserStatCb(username, query, cached);
+      return;
+    }
+    //console.log("no cache");
 
     var newTerms = {};
-    for (name in args)
-      newTerms[name.replace(/_DOT_/g, ".").replace(/_HYPH_/g, "-")] = args[name];
+    for (name in query.args())
+      newTerms[name.replace(/_DOT_/g, ".").replace(/_HYPH_/g, "-")] = query.args()[name];
 
-    var cacheKey = key + "/" + selector + query.id;
-    var cached = cache.get(cacheKey);
-    if (cached) {
-      console.log('got cached');
-      showStats($(entry), cached);
-      if (!forceUpdate)
-        return;
-    }
-
-    //$(selector).find("h2").addClass("loading");
-    entry.find(".value").addClass("loading");
-    
     xhrQueue.enqueue(
       function() {
         return bugzilla.count(
           newTerms,
           function(response) {
             cache.set(cacheKey, response.data);
-            showStats($(entry), response.data);
-            entry.find(".value").removeClass("loading");
+            getUserStatCb(username, query, response.data);
           });
       });
   }
 
-  function report(selector, key, forceUpdate, searchTerms, queries) {
-    var newTerms = {__proto__: defaults};
-    for (name in searchTerms)
-      newTerms[name.replace(/_DOT_/g, ".")] = searchTerms[name];
+  function quickstats(selector, username, isAuthenticated, forceUpdate, query, quickStatsCb) {
+    var entry = $("#templates .statsentry").clone();
+    entry.find(".name").text(query.name);
+    entry.find(".value").text("...");
+    $(selector).append(entry);
 
-    var cacheKey = key + "/" + selector;
-    var cached = cache.get(cacheKey);
-    if (cached) {
-      showBugs($(selector), cached);
-      if (!forceUpdate)
-        return;
-    }
+    entry.find(".value").addClass("loading");
 
-    $(selector).find("h2").addClass("loading");
-    
-    xhrQueue.enqueue(
-      function() {
-        return bugzilla.search(
-          newTerms,
-          function(response) {
-            cache.set(cacheKey, response.bugs);
-            showBugs($(selector), response.bugs);
-            $(selector).find("h2").removeClass("loading");
-          });
-      });
+    getUserStat(username, isAuthenticated, forceUpdate, query,
+      function(username, query, value) {
+        showStats($(entry), value);
+        if (quickStatsCb)
+          quickStatsCb(username, query, value);
+        entry.find(".value").removeClass("loading");
+      }
+    );
   }
-
-  var defaults = {
-    changed_after: dateUtils.timeAgo(MS_PER_WEEK * 14)
-  };
 
   function allQuickStats(myUsername, isAuthenticated, forceUpdate) {
-    var key = myUsername + "_" + (isAuthenticated ? "PRIVATE" : "PUBLIC");
-
     for (q in require("app/queries")) {
       var query = require("app/queries")[q](myUsername);
       if (query.requires_user && !myUsername)
       {
-        console.log("skipping");
+        //console.log("skipping");
         continue;
       }
-      quickstats("#quickstats", key, forceUpdate, query, query.args());
+      quickstats("#quickstats", myUsername, isAuthenticated, forceUpdate, query);
     }
+  }
+
+  function teamStats(selector, teamId, isAuthenticated, forceUpdate) {
+    var team = require("app/teams").get()[teamId];
+    var teamEntry = $("#templates .teamentry").clone();
+    teamEntry.find(".teamname").text(team.name);
+    var table = teamEntry.find(".teamstatstable")
+    var rowTemplate = table.find(".stats-row").remove();
+    $(selector).append(teamEntry);
+    
+    var totalsRow = rowTemplate.clone();
+    totalsRow.find(".name").text("Totals");
+    var totalsStatsCell = totalsRow.find(".stats-cell");
+    table.append(totalsRow);
+
+    for (q in require("app/queries")) {
+      var query = require("app/queries")[q]("");
+      var entryId = "total" + query.id;
+      var entry = $("#templates .statsentry").clone();
+      entry.find(".name").text(query.name);
+      entry.find(".value").text("0");
+      entry.attr("id", entryId);
+      totalsStatsCell.append(entry);
+    }
+    
+    function statsCb(username, query, value) {
+      console.log('statsCb called');
+      var entryId = "total" + query.id;
+      console.log("entryId: " + entryId);
+      var entry = totalsStatsCell.find('#' + entryId);
+      console.log('entry: ' + entry);
+      incrStats(entry, value);
+    }
+    
+    for (m in team.members) {
+      var row = rowTemplate.clone();
+      row.find(".name").text(team.members[m]);
+      table.append(row);
+      for (q in require("app/queries")) {
+        var query = require("app/queries")[q](team.members[m]);
+        quickstats(row.find(".stats-cell"), team.members[m], isAuthenticated, forceUpdate, query, statsCb);
+      }
+    }
+  }
+
+  function teamList() {
+    //console.log("foo");
+    //console.dir(require('app/teams'));
+    var teams = require("app/teams").get();
+    //console.log("bar")
+    //console.dir(teams);
+    var s = "";
+    for (t in teams) {
+      s += teams[t].name;
+    }
+    //console.log('moo');
+    //console.log("s: " + s);
+    $("#quickstats").text(s);
+    //console.log('cow');
   }
 
   function update(myUsername, isAuthenticated, forceUpdate) {
     xhrQueue.clear();
 
     $("#quickstats").html("");
+    
+    teamStats("#quickstats", "ateam", isAuthenticated, forceUpdate);
+    return;
 
-    console.log("who: [" + myUsername + "]");
+    //console.log("who: [" + myUsername + "]");
 
     if (myUsername) {
       $("#quickstats").find("h2").addClass("loading");
@@ -911,9 +974,9 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
   var logoutCommand = {
     name: "logout",
     execute: function execute() {
-      console.log('foo');
+      //console.log('foo');
       require("app/login").set("", "");
-      console.log('foo2');
+      //console.log('foo2');
       var who = require("app/who").get();
       update(who, false, true);
     }

@@ -28,7 +28,6 @@ var Bugzilla = {
 
     function onLoad() {
       var response = JSON.parse(xhr.responseText);
-      console.log('got response');
       if (!response.error)
         options.success(response);
       // TODO: We should really call some kind of error callback
