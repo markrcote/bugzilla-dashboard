@@ -687,17 +687,24 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     entry.find(".value").text(curCount);
   }
 
+  function translateTerms(args) {
+    var newTerms = {};
+    for (name in args)
+      newTerms[name.replace(/_DOT_/g, ".").replace(/_HYPH_/g, "-")] = args[name];
+    return newTerms;
+  }
+
   function getUserStat(username, isAuthenticated, forceUpdate, query, getUserStatCb) {
-    var cacheKey = username + "_" + (isAuthenticated ? "PRIVATE" : "PUBLIC") + "/" + query.id;
-    if (cache.haskey(cacheKey)) {
-      var cached = cache.get(cacheKey);
-      getUserStatCb(username, query, cached);
-      return;
+    if (!forceUpdate) {
+      var cacheKey = username + "_" + (isAuthenticated ? "PRIVATE" : "PUBLIC") + "/" + query.id;
+      if (cache.haskey(cacheKey)) {
+        var cached = cache.get(cacheKey);
+        getUserStatCb(username, query, cached);
+        return;
+      }
     }
 
-    var newTerms = {};
-    for (name in query.args())
-      newTerms[name.replace(/_DOT_/g, ".").replace(/_HYPH_/g, "-")] = query.args()[name];
+    var newTerms = translateTerms(query.args());
 
     xhrQueue.enqueue(
       function() {
