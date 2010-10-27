@@ -463,7 +463,7 @@ Require.modules["app/ui/find-user"] = function(exports, require) {
 
   var options = {
     minLength: 2,
-    delay: 1000,
+    delay: 100,
     source: function(request, response) {
       if (!require("app/login").get().isAuthenticated)
         return;
@@ -882,7 +882,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
   var topCommand = {
     name: "top-page",
     execute: function execute() {
-      window.open("/");  
+      window.open("#");  
     }
   };
 
