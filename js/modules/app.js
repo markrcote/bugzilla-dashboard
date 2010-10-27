@@ -13,7 +13,13 @@ Require.modules["app/teams"] = function(exports) {
         "jhammel@mozilla.com",
         "jgriffin@mozilla.com"
       ]
-    }
+    },
+    devtools: {
+      name: "Developer Tools",
+      members: [
+        "mihai.sucan@gmail.com",
+      ]
+    },
   };
 
   exports.get = function get() {
@@ -208,7 +214,10 @@ Require.modules["app/loader"] = function(exports, require) {
 
 Require.modules["app/who"] = function(exports, require) {
   var callbacks = [];
-  var who = "";
+  var who = {
+    user: "",
+    group: ""
+  };
 
   exports.get = function get() {
     return who;
@@ -218,8 +227,9 @@ Require.modules["app/who"] = function(exports, require) {
     callbacks.push(cb);
   };
 
-  exports.set = function set(username) {
-    who = username;
+  exports.set = function set(username, groupname) {
+    who.user = username;
+    who.group = groupname;
     //console.log('who is now ' + who);
 
     callbacks.forEach(function(cb) { cb(who); });
@@ -551,11 +561,13 @@ Require.modules["app/ui"] = function(exports, require) {
     const BASE_TITLE = document.title;
 
     require("app/who").whenChanged(
-      function changeTitle(username) {
+      function changeTitle(who) {
         var title = BASE_TITLE;
 
-        if (username)
-          title = username + "'s " + BASE_TITLE;
+        if (who.username)
+          title = who.username + "'s " + BASE_TITLE;
+        else if (who.group)
+          title = who.group + "'s " + BASE_TITLE;
 
         if (document.title != title) {
           document.title = title;
@@ -598,13 +610,27 @@ Require.modules["app/ui/hash"] = function(exports, require) {
     return "";
   }
 
+  function groupnameFromHash(location) {
+    if (location.hash) {
+      var match = location.hash.match(/#groupname=(.*)/);
+      if (match)
+        return unescape(match[1]);
+    }
+    return "";
+  }
+
   function setWhoFromHash(location) {
-      var who = usernameFromHash(location);
-      require("app/who").set(who);
+      var user = usernameFromHash(location);
+      var group = groupnameFromHash(location);
+      require("app/who").set(user, group);
   }
 
   exports.usernameToHash = function usernameToHash(username) {
     return "#username=" + escape(username);
+  };
+  
+  exports.groupnameToHash = function groupnameToHash(groupname) {
+    return "#groupname=" + escape(groupname);
   };
 
   exports.init = function init(document) {
@@ -642,125 +668,6 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
   var bugzilla = require("bugzilla");
   var window = require("window");
   var xhrQueue = require("xhr/queue").create();
-
-  function sortByLastChanged(bugs) {
-    var lctimes = {};
-
-    bugs.forEach(
-      function(bug) {
-        lctimes[bug.id] = dateUtils.dateFromISO8601(bug.last_change_time);
-      });
-
-    function compare(a, b) {
-      var alc = lctimes[a.id];
-      var blc = lctimes[b.id];
-
-      if (alc < blc)
-        return -1;
-      if (alc > blc)
-        return 1;
-      return 0;
-    }
-
-    bugs.sort(compare);
-  }
-
-  function updatePrettyDates(query) {
-    query.find(".last-changed").each(
-      function() {
-        var lcTime = $(this).attr("data-last-change");
-        $(this).text(dateUtils.prettyDate(lcTime));
-      });
-  }
-
-  const PRETTY_DATE_UPDATE_INTERVAL = 1000 * 60;
-
-  window.setInterval(function() { updatePrettyDates($("#reports")); },
-                     PRETTY_DATE_UPDATE_INTERVAL);
-
-  const BUGS_TO_SHOW = 10;
-
-  function showBugs(query, bugs) {
-    var table = $("#templates .bugs").clone();
-    var rowTemplate = table.find(".bug-row").remove();
-
-    function appendRowForBug(bug) {
-      var row = rowTemplate.clone();
-      row.attr("id", "bug-id-" + bug.id);
-      row.find(".summary").text(bug.summary);
-      row.addClass("status-" + bug.status);
-      if (bug.priority != "--") {
-        row.addClass(bug.priority);
-        row.addClass(bug.severity);
-      }
-      row.find(".last-changed").attr("data-last-change",
-                                     bug.last_change_time);
-
-      row.click(
-        function onClick() {
-          window.open(bugzilla.getShowBugURL(bug.id));
-        });
-
-      row.hover(
-        function onIn() {
-          var tooltip = $("#templates .bug-tooltip").clone();
-          tooltip.find(".priority").text(bug.priority);
-          // TODO: Show more information in tooltip.
-          $(this).append(tooltip);
-        },
-        function onOut() {
-          $(this).find(".bug-tooltip").remove();
-        });
-      
-      table.append(row);
-    }
-
-    sortByLastChanged(bugs);
-    bugs.reverse();
-
-    var extraBugs = bugs.slice(BUGS_TO_SHOW);
-    bugs = bugs.slice(0, BUGS_TO_SHOW);
-
-    bugs.forEach(appendRowForBug);
-
-    updatePrettyDates(table);
-    query.find(".bugs").remove();
-    query.find(".more-link").remove();
-    query.append(table);
-
-    if (extraBugs.length) {
-      var moreLink = $("#templates .more-link").clone();
-      moreLink.find(".number").text(extraBugs.length);
-      moreLink.click(
-        function() {
-          moreLink.remove();
-          extraBugs.forEach(appendRowForBug);
-          updatePrettyDates(table);
-          removeDuplicateBugs();
-        });
-      query.append(moreLink);
-    }
-
-    table.hide();
-    removeDuplicateBugs();
-    table.fadeIn();
-  }
-
-  // Remove duplicate bugs, preferring the first listing of a bug in
-  // the DOM to later ones. This is b/c the reports further down the
-  // page are the less "interesting" ones, and we want to capture
-  // the most "interesting" part of each bug.
-  function removeDuplicateBugs() {
-    var visited = {};
-    $("#reports .bug-row").each(
-      function() {
-        var id = $(this).attr("id");
-        if (id in visited)
-          $(this).remove();
-        else
-          visited[id] = true;
-      });
-  }
 
   function showStats(entry, bug_count) {
     entry.find(".value").text(bug_count);
@@ -802,7 +709,15 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       });
   }
 
-  function quickstats(selector, username, isAuthenticated, forceUpdate, query, quickStatsCb) {
+  function quickstats(username, isAuthenticated, forceUpdate, query, quickStatsCb) {
+    getUserStat(username, isAuthenticated, forceUpdate, query,
+      function(username, query, value) {
+        quickStatsCb(username, query, value);
+      }
+    );
+  }
+
+  function displayQuickstats(selector, username, isAuthenticated, forceUpdate, query, quickStatsCb) {
     var entry = $("#templates .statsentry").clone();
     entry.find(".name").text(query.name);
     entry.find(".value").text("...");
@@ -810,7 +725,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
 
     entry.find(".value").addClass("loading");
 
-    getUserStat(username, isAuthenticated, forceUpdate, query,
+    quickstats(username, isAuthenticated, forceUpdate, query,
       function(username, query, value) {
         showStats($(entry), value);
         if (quickStatsCb)
@@ -828,11 +743,11 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         //console.log("skipping");
         continue;
       }
-      quickstats("#quickstats", myUsername, isAuthenticated, forceUpdate, query);
+      displayQuickstats("#quickstats", myUsername, isAuthenticated, forceUpdate, query);
     }
   }
 
-  function teamStats(selector, teamId, isAuthenticated, forceUpdate) {
+  function teamStats(selector, teamId, isAuthenticated, forceUpdate, includeMembers) {
     var team = require("app/teams").get()[teamId];
     var teamEntry = $("#templates .teamentry").clone();
     teamEntry.find(".teamname").text(team.name);
@@ -845,6 +760,14 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     var totalsStatsCell = totalsRow.find(".stats-cell");
     table.append(totalsRow);
 
+    if (!includeMembers) {
+       totalsRow.click(
+        function onClick() {
+          var url = require("app/ui/hash").groupnameToHash(teamId);
+          window.open(url);
+        });
+    }
+
     for (q in require("app/queries")) {
       var query = require("app/queries")[q]("");
       var entryId = "total" + query.id;
@@ -856,60 +779,44 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     }
     
     function statsCb(username, query, value) {
-      console.log('statsCb called');
       var entryId = "total" + query.id;
-      console.log("entryId: " + entryId);
       var entry = totalsStatsCell.find('#' + entryId);
-      console.log('entry: ' + entry);
       incrStats(entry, value);
     }
     
     for (m in team.members) {
-      var row = rowTemplate.clone();
-      row.find(".name").text(team.members[m]);
-      table.append(row);
+      if (includeMembers) {
+        var row = rowTemplate.clone();
+        row.find(".name").text(team.members[m]);
+        table.append(row);
+      }
       for (q in require("app/queries")) {
         var query = require("app/queries")[q](team.members[m]);
-        quickstats(row.find(".stats-cell"), team.members[m], isAuthenticated, forceUpdate, query, statsCb);
+        if (includeMembers)
+          displayQuickstats(row.find(".stats-cell"), team.members[m], isAuthenticated, forceUpdate, query, statsCb);
+        else
+          quickstats(team.members[m], isAuthenticated, forceUpdate, query, statsCb);
       }
     }
   }
 
-  function teamList() {
-    //console.log("foo");
-    //console.dir(require('app/teams'));
+  function teamList(isAuthenticated, forceUpdate) {
     var teams = require("app/teams").get();
-    //console.log("bar")
-    //console.dir(teams);
-    var s = "";
     for (t in teams) {
-      s += teams[t].name;
+      teamStats("#quickstats", t, isAuthenticated, forceUpdate, false);
     }
-    //console.log('moo');
-    //console.log("s: " + s);
-    $("#quickstats").text(s);
-    //console.log('cow');
   }
 
-  function update(myUsername, isAuthenticated, forceUpdate) {
-    xhrQueue.clear();
-
-    $("#quickstats").html("");
-    
-    teamStats("#quickstats", "ateam", isAuthenticated, forceUpdate);
-    return;
-
-    //console.log("who: [" + myUsername + "]");
-
-    if (myUsername) {
+  function userStats(username, isAuthenticated, forceUpdate) {
+    if (username) {
       $("#quickstats").find("h2").addClass("loading");
       xhrQueue.enqueue(
         function() {
           return bugzilla.user(
-            myUsername,
+            username,
             function(response) {
               $("#quickstats").find("h2").removeClass("loading");
-              allQuickStats(myUsername, isAuthenticated, forceUpdate);
+              allQuickStats(username, isAuthenticated, forceUpdate);
             },
             function(response) {
               $("#quickstats").find("h2").removeClass("loading");
@@ -917,49 +824,20 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
             });
         });
     } else {
-      allQuickStats(myUsername, isAuthenticated, forceUpdate);
+      allQuickStats(username, isAuthenticated, forceUpdate);
+      teamList(isAuthenticated, forceUpdate);
     }
+  }
 
+  function update(who, isAuthenticated, forceUpdate) {
+    xhrQueue.clear();
 
-/*   
-    report("#code-reviews", key, forceUpdate,
-           {status: ["NEW", "UNCONFIRMED", "ASSIGNED", "REOPENED"],
-            flag_DOT_requestee: myUsername});
+    $("#quickstats").html("");
 
-    report("#assigned-bugs", key, forceUpdate,
-           {status: ["NEW", "UNCONFIRMED", "ASSIGNED", "REOPENED"],
-            email1: myUsername,
-            email1_type: "equals",
-            email1_assigned_to: 1});
-
-    report("#reported-bugs", key, forceUpdate,
-           {status: ["NEW", "UNCONFIRMED", "ASSIGNED", "REOPENED"],
-            email1: myUsername,
-            email1_type: "equals",
-            email1_reporter: 1,
-            email2: myUsername,
-            email2_type: "not_equals",
-            email2_assigned_to: 1});
-
-    report("#cc-bugs", key, forceUpdate,
-           {status: ["NEW", "UNCONFIRMED", "ASSIGNED", "REOPENED"],
-            email1: myUsername,
-            email1_type: "equals",
-            email1_cc: 1,
-            email2: myUsername,
-            email2_type: "not_equals",
-            email2_assigned_to: 1,
-            email2_reporter: 1});
-
-    report("#fixed-bugs", key, forceUpdate,
-           {resolution: ["FIXED"],
-            changed_after: dateUtils.timeAgo(MS_PER_WEEK),
-            email1: myUsername,
-            email1_type: "equals",
-            email1_assigned_to: 1,
-            email1_reporter: 1,
-            email1_cc: 1});
-*/
+    if (who.group)
+      teamStats("#quickstats", who.group, isAuthenticated, forceUpdate, true);
+    else
+      userStats(who.user, isAuthenticated, forceUpdate);
   };
 
   var refreshCommand = {
