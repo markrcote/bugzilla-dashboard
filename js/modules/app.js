@@ -222,7 +222,22 @@ Require.modules["app/teams"] = function(exports) {
 };
 
 Require.modules["app/queries"] = function(exports, require) {
-  exports.open_blockers = function(username) {
+  function addUserQuery(field, type, args, nextB, usernames) {
+    var count = 0;
+    for (u in usernames) {
+      args["field0-" + nextB + "-" + count] = field;
+      args["type0-" + nextB + "-" + count] = type;
+      args["value0-" + nextB + "-" + count] = usernames[u];
+      ++count;
+    }
+    return args;
+  }
+  
+  function addUserAssignedQuery(args, nextB, usernames) {
+    return addUserQuery("assigned_to", "equals", args, nextB, usernames);
+  }
+
+  exports.open_blockers = function(usernames) {
     return {
       id: 'open_blockers',
       name: 'Open blockers',
@@ -237,16 +252,11 @@ Require.modules["app/queries"] = function(exports, require) {
           value0_HYPH_0_HYPH_1: 'final',
           resolution: '---'
         };
-        if (username) {
-          a.email1 = username;
-          a.email1_type = "equals";
-          a.email1_assigned_to = 1;
-        }
-        return a;
+        return addUserAssignedQuery(a, 1, usernames);
       }
     };
   };
-  exports.open_noms = function(username) {
+  exports.open_noms = function(usernames) {
     return {
       id: 'open_noms',
       name: 'Nominations',
@@ -258,50 +268,41 @@ Require.modules["app/queries"] = function(exports, require) {
           value0_HYPH_0_HYPH_0: '?',
           resolution: '---'
         };
-        if (username) {
-          a.email1 = username;
-          a.email1_type = "equals";
-          a.email1_assigned_to = 1;
-        }
-        return a;
+        return addUserAssignedQuery(a, 1, usernames);
       }
     };
   };
-  exports.patches_awaiting_review = function(username) {
+  exports.patches_awaiting_review = function(usernames) {
     return {
       id: 'patches_awaiting_review',
       name: 'Patches awaiting review',
       requires_user: true,
       args: function() {
         // username is mandatory
-        return {
-          type0_HYPH_1_HYPH_0: "substring",
-          field0_HYPH_1_HYPH_0: "flagtypes.name",
-          field0_HYPH_0_HYPH_0: "setters.login_name",
-          resolution: "---",
-          value0_HYPH_1_HYPH_0: "review?",
+        var a = {
           type0_HYPH_0_HYPH_0: "substring",
-          value0_HYPH_0_HYPH_0: username
+          field0_HYPH_0_HYPH_0: "flagtypes.name",
+          value0_HYPH_0_HYPH_0: "review?",
+          resolution: "---",
         };
+        return addUserQuery("setters.login_name", "substring", a, 1, usernames);
       }
     };
   };
-  exports.review_queue = function(username) {
+  exports.review_queue = function(usernames) {
     return {
       id: 'review_queue',
       name: 'Review queue',
       requires_user: true,
       args: function() {
-        return {
-          field0_HYPH_0_HYPH_0: "flag.requestee",
-          type0_HYPH_0_HYPH_0: "substring",
-          value0_HYPH_0_HYPH_0: username,
+        var a = {
           resolution: "---"
         };
+        return addUserQuery("flag.requestee", "equals", a, 0, usernames);
       }
     };
   };
-  exports.crashers = function(username) {
+  exports.crashers = function(usernames) {
     return {
       id: 'crashers',
       name: 'Crashers',
@@ -319,16 +320,11 @@ Require.modules["app/queries"] = function(exports, require) {
           value0_HYPH_1_HYPH_1: 'final',
           resolution: '---'
         };
-        if (username) {
-          a.type0_HYPH_2_HYPH_0 = 'equals',
-          a.field0_HYPH_2_HYPH_0 = 'assigned_to',
-          a.value0_HYPH_2_HYPH_0 = username
-        }
-        return a;
+        return addUserAssignedQuery(a, 2, usernames);
       }
     };
   };
-  exports.security = function(username) {
+  exports.security = function(usernames) {
     return {
       id: 'security',
       name: 'Security',
@@ -343,16 +339,11 @@ Require.modules["app/queries"] = function(exports, require) {
           type0_HYPH_0_HYPH_0: 'equals',
           value0_HYPH_0_HYPH_0: 'Security'
         };
-        if (username) {
-          a.email1 = username;
-          a.email1_type = "equals";
-          a.email1_assigned_to = 1;
-        }
-        return a;
+        return addUserAssignedQuery(a, 1, usernames);
       }
     };
   };
-  exports.blockers_fixed_30_days = function(username) {
+  exports.blockers_fixed_30_days = function(usernames) {
     return {
       id: 'blockers_fixed_30_days',
       name: 'Blockers fixed in the last 30 days',
@@ -371,16 +362,11 @@ Require.modules["app/queries"] = function(exports, require) {
           value0_HYPH_0_HYPH_0: 'final',
           resolution: 'FIXED'
         };
-        if (username) {
-          a.email1 = username;
-          a.email1_type = "equals";
-          a.email1_assigned_to = 1;
-        }
-        return a;
+        return addUserAssignedQuery(a, 1, usernames);
       }
     };
   };
-  exports.nonblockers_fixed_30_days = function(username) {
+  exports.nonblockers_fixed_30_days = function(usernames) {
     return {
       id: 'nonblockers_fixed_30_days',
       name: 'Nonblockers fixed in the last 30 days',
@@ -399,12 +385,7 @@ Require.modules["app/queries"] = function(exports, require) {
           value0_HYPH_1_HYPH_0: 'beta',
           resolution: 'FIXED'
         };
-        if (username) {
-          a.email1 = username;
-          a.email1_type = "equals";
-          a.email1_assigned_to = 1;
-        }
-        return a;
+        return addUserAssignedQuery(a, 2, usernames);
       }
     };
   };
@@ -895,12 +876,12 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     return newTerms;
   }
 
-  function getUserStat(username, isAuthenticated, forceUpdate, query, getUserStatCb) {
+  function getUserStat(cacheid, usernames, isAuthenticated, forceUpdate, query, getUserStatCb) {
     if (!forceUpdate) {
-      var cacheKey = username + "_" + (isAuthenticated ? "PRIVATE" : "PUBLIC") + "/" + query.id;
+      var cacheKey = cacheid + "_" + (isAuthenticated ? "PRIVATE" : "PUBLIC") + "/" + query.id;
       if (cache.haskey(cacheKey)) {
         var cached = cache.get(cacheKey);
-        getUserStatCb(username, query, cached);
+        getUserStatCb(usernames, query, cached);
         return;
       }
     }
@@ -913,20 +894,20 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
           newTerms,
           function(response) {
             cache.set(cacheKey, response.data);
-            getUserStatCb(username, query, response.data);
+            getUserStatCb(usernames, query, response.data);
           });
       });
   }
 
-  function quickstats(username, isAuthenticated, forceUpdate, query, quickStatsCb) {
-    getUserStat(username, isAuthenticated, forceUpdate, query,
-      function(username, query, value) {
-        quickStatsCb(username, query, value);
+  function quickstats(cacheid, usernames, isAuthenticated, forceUpdate, query, quickStatsCb) {
+    getUserStat(cacheid, usernames, isAuthenticated, forceUpdate, query,
+      function(usernames, query, value) {
+        quickStatsCb(usernames, query, value);
       }
     );
   }
 
-  function displayQuickstats(selector, username, isAuthenticated, forceUpdate, query, quickStatsCb) {
+  function displayQuickstats(selector, cacheid, usernames, isAuthenticated, forceUpdate, query, quickStatsCb) {
     var entry = $("#templates .statsentry").clone();
     entry.find(".name").text(query.name);
     entry.find(".value").text("...");
@@ -934,7 +915,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
 
     entry.find(".value").addClass("loading");
 
-    quickstats(username, isAuthenticated, forceUpdate, query,
+    quickstats(cacheid, usernames, isAuthenticated, forceUpdate, query,
       function(username, query, value) {
         showStats($(entry), value);
         if (quickStatsCb)
@@ -944,12 +925,13 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     );
   }
 
-  function allQuickStats(selector, myUsername, isAuthenticated, forceUpdate) {
+  function allQuickStats(selector, username, isAuthenticated, forceUpdate) {
+    // for just one user (or no user)
     for (q in require("app/queries")) {
-      var query = require("app/queries")[q](myUsername);
-      if (query.requires_user && !myUsername)
+      var query = require("app/queries")[q]([username]);
+      if (query.requires_user && !username)
         continue;
-      displayQuickstats(selector, myUsername, isAuthenticated, forceUpdate, query);
+      displayQuickstats(selector, username, [username], isAuthenticated, forceUpdate, query);
     }
   }
 
@@ -963,7 +945,6 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     
     var totalsRow = rowTemplate.clone();
     totalsRow.find(".name").text("Totals");
-    totalsRow.find(".stats-cell").addClass("loading");
     var totalsStatsCell = totalsRow.find(".stats-cell");
     table.append(totalsRow);
 
@@ -977,38 +958,21 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     }
 
     for (q in require("app/queries")) {
-      var query = require("app/queries")[q]("");
-      var entryId = "total" + query.id;
-      var entry = $("#templates .statsentry").clone();
-      entry.find(".name").text(query.name);
-      entry.find(".value").text("0");
-      entry.attr("id", entryId);
-      totalsStatsCell.append(entry);
+      var member_emails = team.members.map(function(x) { return x[1]; });
+      var query = require("app/queries")[q](member_emails);
+      displayQuickstats(totalsStatsCell, teamId, member_emails, isAuthenticated, forceUpdate, query);
     }
 
-    var numQueries = 0;
-    
-    function statsCb(username, query, value) {
-      var entryId = "total" + query.id;
-      var entry = totalsStatsCell.find('#' + entryId);
-      incrStats(entry, value);
-      if (--numQueries == 0)
-        totalsRow.find(".stats-cell").removeClass("loading");
-    }
-    
+    if (!includeMembers)
+      return;
+
     for (m in team.members) {
-      if (includeMembers) {
-        var row = rowTemplate.clone();
-        row.find(".name").text(team.members[m][0]);
-        table.append(row);
-      }
+      var row = rowTemplate.clone();
+      row.find(".name").text(team.members[m][0]);
+      table.append(row);
       for (q in require("app/queries")) {
-        ++numQueries;
-        var query = require("app/queries")[q](team.members[m][1]);
-        if (includeMembers)
-          displayQuickstats(row.find(".stats-cell"), team.members[m][1], isAuthenticated, forceUpdate, query, statsCb);
-        else
-          quickstats(team.members[m], isAuthenticated, forceUpdate, query, statsCb);
+        var query = require("app/queries")[q]([team.members[m][1]]);
+        displayQuickstats(row.find(".stats-cell"), team.members[m][1], [team.members[m][1]], isAuthenticated, forceUpdate, query);
       }
     }
   }
