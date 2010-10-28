@@ -1,3 +1,5 @@
+/* Insert your team data and rename this file to teams.js */
+
 Require.modules["teams"] = function(exports) {
   var default_teams = {
     foo: {
