@@ -4,23 +4,217 @@ const MS_PER_WEEK = MS_PER_DAY * 7;
 
 Require.modules["app/teams"] = function(exports) {
   var teams = {
-    ateam: {
+    layout: {
+      name: "Layout",
+      members: [
+        ["Robert O'Callahan", "roc@ocallahan.org"],
+        ["Ehsan Akhgari", "ehsan.akhgari@gmail.com"],
+        ["David Baron", "dbaron@dbaron.org"],
+        ["Brian Birtles", "birtles@gmail.com"],
+        ["Chris Double", "chris.double@double.co.nz"],
+        ["Elika Etemad", "fantasai.bugs@inkedblade.net"],
+        ["Matthew Gregan", "kinetik@flim.org"],
+        ["Mats Palmgren", "matspal@gmail.com"],
+        ["Jonathan Kew", "jfkthame@gmail.com"],
+        ["Simon Montagu", "smontagu@smontagu.org"],
+        ["Cameron McCormack", "cam@mcc.id.au"],
+        ["Josh Matthews", "josh@joshmatthews.net"],
+        ["Daniel Holbert", "dholbert@mozilla.com"],
+        ["Timothy Nikkel", "tnikkel@gmail.com"],
+        ["Chris Pearce", "chris@pearce.org.nz"],
+        ["Markus Stange", "mstange@themasta.com"],
+        ["Tim Terriberry", "tterribe@vt.edu"],
+        ["Karl Tomlinson", "karlt@mozbugz.karlt.net"],
+        ["Michael Ventnor", "ventnor.bugzilla@gmail.com"],
+        ["Jonathan Watt", "jwatt@jwatt.org"],
+        ["Matt Woodrow", "matt.woodrow+bugzilla@gmail.com"],
+        ["John Daggett", "jdaggett@mozilla.com"],
+      ]
+    },
+    localization: {
+      name: "Localization",
+      members: [
+        ["Seth Bindernagel", "sethb@mozilla.com"],
+        ["Zbigniew Braniecki", "gandalf@aviary.pl"],
+        ["Axel Hecht", "l10n@mozilla.com"],
+        ["Stanislaw Malolepszy", "stas@mozilla.com"],
+        ["Pascal Chvrel", "pascalc@gmail.com"],
+        ["Delphine Lebedel", "lebedel.delphine@gmail.com"],
+      ]
+    },
+    mobile: {
+      name: "Mobile",
+      members: [
+        ["Stuart Parmenter", "pavlov@pavlov.net"],
+        ["Brian Crowder", "crowderbt@gmail.com"],
+        ["Fabrice Desre", "fabrice.desre@gmail.com"],
+        ["Wesley Johnston", "wjohnston@mozilla.com"],
+        ["Mark Finkle", "mark.finkle@gmail.com"],
+        ["Matt Brubeck", "mbrubeck@mozilla.com"],
+        ["Vivien Nicolas", "21@vingtetun.org"],
+        ["Benjamin Stover", "webapps@stechz.com"],
+        ["Brad Lassey", "blassey.bugs@lassey.us"],
+        ["Alex Pakhotin", "apakhotin@mozilla.com"],
+        ["Michael Wu", "mwu@mozilla.com"],
+        ["Doug Turner", "doug.turner@gmail.com"],
+        ["Mike Kristoffersen", "mkristoffersen@mozilla.com"],
+        ["Alon Zakai", "azakai@mozilla.com"],
+      ]
+    },
+    user_experience_firefox: {
+      name: "User Experience Firefox",
+      members: [
+        ["Alexander Limi", "limi@mozilla.com"],
+        ["Jennifer Boriss", "jboriss@mozilla.com"],
+        ["Alex Faaborg", "faaborg@mozilla.com"],
+        ["Stephen Horlander", "shorlander@mozilla.com"],
+        ["Aza Raskin", "aza@mozilla.com"],
+        ["Michael Yoshitaka Erlewine", "mitcho@mitcho.com"],
+      ]
+    },
+    tools_and_automation: {
       name: "Tools and Automation",
       members: [
-        "mcote@mozilla.com",
-        "ctalbert@mozilla.com",
-        "fayearthur+bugs@gmail.com",
-        "jhammel@mozilla.com",
-        "jgriffin@mozilla.com"
+        ["Bob Moss", "bmoss@mozilla.com"],
+        ["Mark Cote", "mcote@mozilla.com"],
+        ["Ted Mielczarek", "ted.mielczarek@gmail.com"],
+        ["Alice Nodelman", "anodelman@mozilla.com"],
+        ["Clint Talbert", "ctalbert@mozilla.com"],
+        ["Heather Arthur", "fayearthur+bugs@gmail.com"],
+        ["Bob Clary", "bclary@bclary.com"],
+        ["Jonathan Griffin", "jgriffin@mozilla.com"],
+        ["Jeffrey Hammel", "jhammel@mozilla.com"],
+        ["Joel Maher", "jmaher@mozilla.com"],
       ]
     },
-    devtools: {
+    content: {
+      name: "Content",
+      members: [
+        ["Jonny Stenback", "jst@mozilla.org"],
+        ["Honza Bambas", "honzab.moz@firemni.cz"],
+        ["Jason Duell", "jduell.mcbugs@gmail.com"],
+        ["Blake Kaplan", "mrbkap@gmail.com"],
+        ["Mounir Lamouri", "mounir.lamouri@gmail.com"],
+        ["Justin Lebar", "justin.lebar+bug@gmail.com"],
+        ["Olli Pettay", "olli.pettay@gmail.com"],
+        ["Jonas Sicking", "jonas@sicking.cc"],
+        ["Henri Sivonen", "hsivonen@iki.fi"],
+        ["Ben Turner", "bent.mozilla@gmail.com"],
+        ["Peter Van Der Beken", "peterv@propagandism.org"],
+        ["Boris Zbarsky", "bzbarsky@mit.edu"],
+      ]
+    },
+    general_platform: {
+      name: "General Platform",
+      members: [
+        ["Damon Sicore", "dsicore@mozilla.com"],
+        ["Josh Aas", "joshmoz@gmail.com"],
+        ["David Bolter", "bolterbugz@gmail.com"],
+        ["Steve Fink", "sphink@gmail.com"],
+        ["Taras Glek", "tglek@mozilla.com"],
+        ["Scott Greenlay", "sgreenlay@mozilla.com"],
+        ["Brian Hackett", "bhackett1024@gmail.com"],
+        ["Michal Novotny", "michal.novotny@gmail.com"],
+        ["Mark Steele", "mwsteele@gmail.com"],
+        ["Alexander Surkov", "surkov.alexander@gmail.com"],
+        ["Steven Michaud", "smichaud@pobox.com"],
+        ["Benjamin Smedberg", "benjamin@smedbergs.us"],
+        ["Chris Jones", "jones.chris.g@gmail.com"],
+        ["Jim Mathies", "jmathies@mozilla.com"],
+        ["Dan Witte", "dwitte@gmail.com"],
+        ["Rachel Zhang", "rachelzhang1@gmail.com"],
+        ["Shawn Wilsher", "sdwilsh@forerunnerdesigns.com"],
+      ]
+    },
+    engineering: {
+      name: "Engineering",
+      members: [
+        ["Mike Shaver", "shaver@mozilla.org"],
+      ]
+    },
+    graphics: {
+      name: "Graphics",
+      members: [
+        ["Benoit Jacob", "bjacob@mozilla.com"],
+        ["Benoit Girard", "bgirard@mozilla.com"],
+        ["Jeff Muizelaar", "jmuizelaar@mozilla.com"],
+        ["Bas Schouten", "bas.schouten@live.nl"],
+        ["Bobby Holley", "bobbyholley+bmo@gmail.com"],
+        ["Vladimir Vukicevic", "vladimir@pobox.com"],
+      ]
+    },
+    firefox_front_end: {
+      name: "Firefox Front End",
+      members: [
+        ["Jonathan Nightingale", "johnath@mozilla.com"],
+        ["Rob Campbell", "rcampbell@mozilla.com"],
+        ["Dao Gottwald", "dao@mozilla.com"],
+        ["Christian Legnitto", "clegnitto@mozilla.com"],
+        ["Jan Odvarko", "odvarko@gmail.com"],
+        ["Gavin Sharp", "gavin.sharp@gmail.com"],
+        ["Robert Strong", "robert.bugzilla@gmail.com"],
+        ["Dave Townsend", "dtownsend@mozilla.com"],
+        ["Kathleen Wilson", "kathleen95014@yahoo.com"],
+        ["Dietrich Ayala", "dietrich@mozilla.com"],
+        ["Marco Bonardo", "mak77@bonardo.net"],
+        ["David Dahl", "ddahl@mozilla.com"],
+        ["Neil Deakin", "enndeakin@gmail.com"],
+        ["Drew Willcoxon", "adw@mozilla.com"],
+        ["Justin Dolske", "dolske@mozilla.com"],
+        ["Margaret Leibovic", "margaret.leibovic@gmail.com"],
+        ["Blair McBride", "bmcbride@mozilla.com"],
+        ["Paul O'Shannessy", "paul@oshannessy.com"],
+        ["Frank Yan", "fryn@frankyan.com"],
+      ]
+    },
+    security: {
+      name: "Security",
+      members: [
+        ["Lucas Adamski", "ladamski@mozilla.com"],
+        ["David Chan", "dchan@mozilla.com"],
+        ["Gary Kwong", "gary@rumblingedge.com"],
+        ["Jesse Ruderman", "jruderman@gmail.com"],
+        ["Sid Stamm", "sstamm@mozilla.com"],
+        ["Brandon Sterne", "bsterne@mozilla.com"],
+        ["Daniel Veditz", "dveditz@mozilla.com"],
+      ]
+    },
+    js: {
+      name: "JS",
+      members: [
+        ["Rob Sayre", "sayrer@gmail.com"],
+        ["David Mandelin", "dvander@alliedmods.net"],
+        ["Andreas Gal", "gal@uci.edu"],
+        ["Tom Austin", "taustin@mozilla.com"],
+        ["David Anderson", "dvander@alliedmods.net"],
+        ["Paul Biggar", "pbiggar@mozilla.com"],
+        ["Jim Blandy", "jimb@mozilla.com"],
+        ["Igor Bukanov", "igor@mir2.org"],
+        ["Andrew Drake", "adrake@mozilla.com"],
+        ["Graydon Hoare", "graydon@mozilla.com"],
+        ["Bruce Hoult", "bruce@hoult.org"],
+        ["Christopher Leary", "cdleary@mozilla.com"],
+        ["Nicholas Nethercote", "nnethercote@mozilla.com"],
+        ["Jason Orendorff", "jorendorff@mozilla.com"],
+        ["Julian Sweard", "jseward@acm.org"],
+        ["Brian Smith", "bsmith@mozilla.com"],
+        ["Sean Stangl", "sstangl@mozilla.com"],
+        ["Gregor Wagner", "anygregor@gmail.com"],
+        ["Luke Wagner", "lw@mozilla.com"],
+        ["Jeff Walden", "jwalden+bmo@mit.edu"],
+        ["Brendan Eich", "brendan@mozilla.org"],
+        ["Roy Frostig", "froystig@cs.stanford.edu"],
+      ]
+    },
+    developer_tools: {
       name: "Developer Tools",
       members: [
-        "mihai.sucan@gmail.com",
+        ["Kevin Dangoor", "kdangoor@mozilla.com"],
+        ["Mihai Sucan", "mihai.sucan@gmail.com"],
+        ["Joe Walker", "jwalker@mozilla.com"],
+        ["Patrick Walton", "pwalton@mozilla.com"],
       ]
-    },
-  };
+    },  };
 
   exports.get = function get() {
     return teams;
@@ -116,12 +310,19 @@ Require.modules["app/queries"] = function(exports, require) {
         var a = {
           field0_HYPH_0_HYPH_0: 'keywords',
           type0_HYPH_0_HYPH_0: 'anywords',
-          value0_HYPH_0_HYPH_0: 'crash topcrash'
+          value0_HYPH_0_HYPH_0: 'crash topcrash',
+          field0_HYPH_1_HYPH_0: 'cf_blocking_20',
+          type0_HYPH_1_HYPH_0: 'substring',
+          value0_HYPH_1_HYPH_0: 'beta',
+          field0_HYPH_1_HYPH_1: 'cf_blocking_20',
+          type0_HYPH_1_HYPH_1: 'substring',
+          value0_HYPH_1_HYPH_1: 'final',
+          resolution: '---'
         };
         if (username) {
-          a.email1 = username;
-          a.email1_type = "equals";
-          a.email1_assigned_to = 1;
+          a.type0_HYPH_2_HYPH_0 = 'equals',
+          a.field0_HYPH_2_HYPH_0 = 'assigned_to',
+          a.value0_HYPH_2_HYPH_0 = username
         }
         return a;
       }
@@ -798,14 +999,14 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     for (m in team.members) {
       if (includeMembers) {
         var row = rowTemplate.clone();
-        row.find(".name").text(team.members[m]);
+        row.find(".name").text(team.members[m][0]);
         table.append(row);
       }
       for (q in require("app/queries")) {
         ++numQueries;
-        var query = require("app/queries")[q](team.members[m]);
+        var query = require("app/queries")[q](team.members[m][1]);
         if (includeMembers)
-          displayQuickstats(row.find(".stats-cell"), team.members[m], isAuthenticated, forceUpdate, query, statsCb);
+          displayQuickstats(row.find(".stats-cell"), team.members[m][1], isAuthenticated, forceUpdate, query, statsCb);
         else
           quickstats(team.members[m], isAuthenticated, forceUpdate, query, statsCb);
       }
