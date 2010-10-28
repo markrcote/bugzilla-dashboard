@@ -13,6 +13,16 @@ Require.modules["queries"] = function(exports, require) {
   function addUserAssignedQuery(args, nextB, usernames) {
     return addUserQuery("assigned_to", "equals", args, nextB, usernames);
   }
+  
+  function addBlockerQuery(args, nextB) {
+    args["field0-" + nextB + "-0"] = "cf_blocking_20";
+    args["type0-" + nextB + "-0"] = "substring";
+    args["value0-" + nextB + "-0"] = "final";
+    args["field0-" + nextB + "-1"] = "cf_blocking_20";
+    args["type0-" + nextB + "-1"] = "substring";
+    args["value0-" + nextB + "-1"] = "beta";
+    return args;
+  }
 
   exports.open_blockers = function(usernames) {
     return {
@@ -21,14 +31,9 @@ Require.modules["queries"] = function(exports, require) {
       requires_user: false,
       args: function() {
         var a = {
-          field0_HYPH_0_HYPH_0: 'cf_blocking_20',
-          type0_HYPH_0_HYPH_0: 'substring',
-          value0_HYPH_0_HYPH_0: 'beta',
-          field0_HYPH_0_HYPH_1: 'cf_blocking_20',
-          type0_HYPH_0_HYPH_1: 'substring',
-          value0_HYPH_0_HYPH_1: 'final',
           resolution: '---'
         };
+        a = addBlockerQuery(a, 0);
         return addUserAssignedQuery(a, 1, usernames);
       }
     };
@@ -36,14 +41,14 @@ Require.modules["queries"] = function(exports, require) {
   exports.open_noms = function(usernames) {
     return {
       id: 'open_noms',
-      name: 'Nominations',
+      name: 'Blocker nominations',
       requires_user: false,
       args: function() {
         var a = {
+          resolution: '---',
           field0_HYPH_0_HYPH_0: 'cf_blocking_20',
           type0_HYPH_0_HYPH_0: 'equals',
           value0_HYPH_0_HYPH_0: '?',
-          resolution: '---'
         };
         return addUserAssignedQuery(a, 1, usernames);
       }
@@ -56,17 +61,12 @@ Require.modules["queries"] = function(exports, require) {
       requires_user: false,
       args: function() {
         var a = {
-          field0_HYPH_0_HYPH_0: 'cf_blocking_20',
-          type0_HYPH_0_HYPH_0: 'substring',
-          value0_HYPH_0_HYPH_0: 'beta',
-          field0_HYPH_0_HYPH_1: 'cf_blocking_20',
-          type0_HYPH_0_HYPH_1: 'substring',
-          value0_HYPH_0_HYPH_1: 'final',
-          field0_HYPH_1_HYPH_0: 'keywords',
-          type0_HYPH_1_HYPH_0: 'anywords',
-          value0_HYPH_1_HYPH_0: 'regression',
-          resolution: '---'
+          resolution: '---',
+          field0_HYPH_0_HYPH_0: 'keywords',
+          type0_HYPH_0_HYPH_0: 'anywords',
+          value0_HYPH_0_HYPH_0: 'regression',
         };
+        a = addBlockerQuery(a, 1);
         return addUserAssignedQuery(a, 2, usernames);
       }
     };
@@ -79,10 +79,10 @@ Require.modules["queries"] = function(exports, require) {
       args: function() {
         // username is mandatory
         var a = {
+          resolution: "---",
           type0_HYPH_0_HYPH_0: "substring",
           field0_HYPH_0_HYPH_0: "flagtypes.name",
           value0_HYPH_0_HYPH_0: "review?",
-          resolution: "---",
         };
         return addUserQuery("setters.login_name", "substring", a, 1, usernames);
       }
@@ -104,21 +104,16 @@ Require.modules["queries"] = function(exports, require) {
   exports.crashers = function(usernames) {
     return {
       id: 'crashers',
-      name: 'Crashers',
+      name: 'Crasher blockers',
       requires_user: false,
       args: function() {
         var a = {
+          resolution: '---',
           field0_HYPH_0_HYPH_0: 'keywords',
           type0_HYPH_0_HYPH_0: 'anywords',
           value0_HYPH_0_HYPH_0: 'crash topcrash',
-          field0_HYPH_1_HYPH_0: 'cf_blocking_20',
-          type0_HYPH_1_HYPH_0: 'substring',
-          value0_HYPH_1_HYPH_0: 'beta',
-          field0_HYPH_1_HYPH_1: 'cf_blocking_20',
-          type0_HYPH_1_HYPH_1: 'substring',
-          value0_HYPH_1_HYPH_1: 'final',
-          resolution: '---'
         };
+        a = addBlockerQuery(a, 1);
         return addUserAssignedQuery(a, 2, usernames);
       }
     };
@@ -126,19 +121,20 @@ Require.modules["queries"] = function(exports, require) {
   exports.security = function(usernames) {
     return {
       id: 'security',
-      name: 'Security',
+      name: 'Security blockers',
       requires_user: false,
       args: function() {
         var a = {
-          field0_HYPH_0_HYPH_0: 'component',
-          type0_HYPH_0_HYPH_1: 'allwordssubstr',
-          field0_HYPH_0_HYPH_1: 'status_whiteboard',
           resolution: '---',
-          value0_HYPH_0_HYPH_1: '[sg:',
+          field0_HYPH_0_HYPH_0: 'component',
           type0_HYPH_0_HYPH_0: 'equals',
-          value0_HYPH_0_HYPH_0: 'Security'
+          value0_HYPH_0_HYPH_0: 'Security',
+          field0_HYPH_0_HYPH_1: 'status_whiteboard',
+          type0_HYPH_0_HYPH_1: 'allwordssubstr',
+          value0_HYPH_0_HYPH_1: '[sg:',
         };
-        return addUserAssignedQuery(a, 1, usernames);
+        a = addBlockerQuery(a, 1);
+        return addUserAssignedQuery(a, 2, usernames);
       }
     };
   };
@@ -149,18 +145,13 @@ Require.modules["queries"] = function(exports, require) {
       requires_user: false,
       args: function() {
         var a = {
+          resolution: 'FIXED',
           changed_field: 'resolution',
           changed_field_to: 'FIXED',
           changed_before: 'Now',
-          changed_after: require("date-utils").timeAgo(MS_PER_DAY * 30),
-          field0_HYPH_0_HYPH_0: 'cf_blocking_20',
-          type0_HYPH_0_HYPH_1: 'substring',
-          value0_HYPH_0_HYPH_1: 'beta',
-          type0_HYPH_0_HYPH_0: 'substring',
-          field0_HYPH_0_HYPH_1: 'cf_blocking_20',
-          value0_HYPH_0_HYPH_0: 'final',
-          resolution: 'FIXED'
+          changed_after: require("date-utils").timeAgo(MS_PER_DAY * 30)
         };
+        a = addBlockerQuery(a, 0);
         return addUserAssignedQuery(a, 1, usernames);
       }
     };
@@ -172,6 +163,7 @@ Require.modules["queries"] = function(exports, require) {
       requires_user: false,
       args: function() {
         var a = {
+          resolution: 'FIXED',
           changed_field: 'resolution',
           changed_field_to: 'FIXED',
           changed_before: 'Now',
@@ -182,7 +174,6 @@ Require.modules["queries"] = function(exports, require) {
           field0_HYPH_1_HYPH_0: 'cf_blocking_20',
           type0_HYPH_1_HYPH_0: 'notsubstring',
           value0_HYPH_1_HYPH_0: 'beta',
-          resolution: 'FIXED'
         };
         return addUserAssignedQuery(a, 2, usernames);
       }
