@@ -1,8 +1,45 @@
+Require.modules["bool-chart"] = function(exports) {
+  exports.boolChart = function boolChart(ands, chartNum) {
+    var A = 0;
+    if (chartNum)
+      A = chartNum;
+    var curB = 0;
+    var curC = 0;
+    
+    var args = {};
+    
+    for (a in ands) {
+      curB = 0;
+      for (o in ands[a]) {
+        curC = 0;
+        // ors
+        console.log(typeof ands[a][o]);
+        for (t in ands[a][o]) {
+          // triples
+          console.dir(ands[a][o][t]);
+          args["field" + A + "-" + curB + "-" + curC] = ands[a][o][t].field;
+          args["type" + A + "-" + curB + "-" + curC] = ands[a][o][t].type;
+          args["value" + A + "-" + curB + "-" + curC] = ands[a][o][t].value;
+          ++curC;
+        }
+        ++curB;
+      }
+    }
+    return args;
+  };
+}
+
 var Bugzilla = {
   BASE_URL: "https://api-dev.bugzilla.mozilla.org/latest",
   BASE_UI_URL: "https://bugzilla.mozilla.org",
   DEFAULT_OPTIONS: {
     method: "GET"
+  },
+  FIELD_NAME_MAP: {
+    changed_after: "chfieldfrom",
+    changed_before: "chfieldto",
+    changed_field: "chfield",
+    changed_field_to: "chfieldvalue"
   },
   getShowBugURL: function Bugzilla_getShowBugURL(id) {
     return this.BASE_UI_URL + "/show_bug.cgi?id=" + id;
@@ -71,5 +108,18 @@ var Bugzilla = {
                       data: {},
                       success: cb,
                       fail: errcb});
+    
+  },
+  uiQueryUrl: function Bugzilla_uiQuery(query) {
+    var newTerms = {};
+    for (q in query) {
+      if (q in this.FIELD_NAME_MAP)
+        newTerms[this.FIELD_NAME_MAP[q]] = query[q];
+      else if (q.slice(0, 5) == "field" && query[q] in this.FIELD_NAME_MAP) // boolean charts
+        newTerms[q] = this.FIELD_NAME_MAP[query[q]];
+      else
+        newTerms[q] = query[q];
+    }
+    return this.BASE_UI_URL + "/buglist.cgi?" + this.queryString(newTerms);
   }
 };

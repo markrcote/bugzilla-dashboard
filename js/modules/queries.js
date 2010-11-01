@@ -1,4 +1,16 @@
 Require.modules["queries"] = function(exports, require) {
+
+  /*
+   Most of the work is done through REST, but we're using the CGI
+   field names because we want to be able to generate links to
+   the Bugzilla site, and there is no mechanism to translate the
+   field names (aside from what the REST API does automatically).
+  
+   If, for whatever reason, support for the CGI field names is
+   dropped from the REST API, this will have to change, possibly
+   into two separate URLs for each query.
+  */
+  
   function addUserQuery(field, type, args, nextB, usernames) {
     var count = 0;
     for (u in usernames) {
@@ -63,8 +75,8 @@ Require.modules["queries"] = function(exports, require) {
         var a = {
           resolution: '---',
           field0_HYPH_0_HYPH_0: 'keywords',
-          type0_HYPH_0_HYPH_0: 'anywords',
-          value0_HYPH_0_HYPH_0: 'regression',
+          type0_HYPH_0_HYPH_0: 'substring',
+          value0_HYPH_0_HYPH_0: 'regression'
         };
         a = addBlockerQuery(a, 1);
         return addUserAssignedQuery(a, 2, usernames);
@@ -82,7 +94,7 @@ Require.modules["queries"] = function(exports, require) {
           resolution: "---",
           type0_HYPH_0_HYPH_0: "substring",
           field0_HYPH_0_HYPH_0: "flagtypes.name",
-          value0_HYPH_0_HYPH_0: "review?",
+          value0_HYPH_0_HYPH_0: "review?"
         };
         return addUserQuery("setters.login_name", "substring", a, 1, usernames);
       }
@@ -97,7 +109,8 @@ Require.modules["queries"] = function(exports, require) {
         var a = {
           resolution: "---"
         };
-        return addUserQuery("flag.requestee", "equals", a, 0, usernames);
+        // REST API is flag.requestee
+        return addUserQuery("requestees.login_name", "equals", a, 0, usernames);
       }
     };
   };
@@ -173,7 +186,7 @@ Require.modules["queries"] = function(exports, require) {
           value0_HYPH_0_HYPH_0: 'final',
           field0_HYPH_1_HYPH_0: 'cf_blocking_20',
           type0_HYPH_1_HYPH_0: 'notsubstring',
-          value0_HYPH_1_HYPH_0: 'beta',
+          value0_HYPH_1_HYPH_0: 'beta'
         };
         return addUserAssignedQuery(a, 2, usernames);
       }

@@ -526,6 +526,8 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
 
   function displayQuickstats(selector, cacheid, usernames, isAuthenticated, forceUpdate, query, quickStatsCb) {
     var entry = $("#templates .statsentry").clone();
+    entry.click(function() { window.open(bugzilla.uiQueryUrl(translateTerms(query.args()))); });
+    entry.addClass("teamlink");
     entry.find(".name").text(query.name);
     entry.find(".value").text("...");
     $(selector).append(entry);
