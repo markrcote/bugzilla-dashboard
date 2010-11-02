@@ -233,7 +233,7 @@ div.indicator-box {
     width: 36px;
     height: 36px;
     text-align: center;
-    border: 1px dotted black;
+    border: 3px outset black;
     vertical-align: middle;
 }
 
