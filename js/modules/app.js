@@ -360,25 +360,6 @@ Require.modules["app/ui"] = function(exports, require) {
   // For Firefox.
   $(".dialog").keypress(dismissDialogOnEscape);
 
-  function setupDocumentTitleChanger(document) {
-    const BASE_TITLE = document.title;
-
-    require("app/who").whenChanged(
-      function changeTitle(who) {
-        var title = BASE_TITLE;
-
-        if (who.user)
-          title = who.user + "'s " + BASE_TITLE;
-        else if (who.group)
-          title = who.group + "'s " + BASE_TITLE;
-
-        if (document.title != title) {
-          document.title = title;
-          $("#header .title").text(title);
-        }
-      });
-  };
-
   function openDialog(name) {
     var dialog = $("#" + name);
     if (dialog.length == 0)
@@ -390,8 +371,6 @@ Require.modules["app/ui"] = function(exports, require) {
   };
 
   exports.init = function init(document) {
-    setupDocumentTitleChanger(document);
-
     require("app/ui/repair").init();
     require("app/ui/dashboard").init();
     require("app/ui/login-form").init();
@@ -527,10 +506,10 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
   function displayQuickstats(selector, cacheid, usernames, isAuthenticated, forceUpdate, query, quickStatsCb) {
     var entry = $("#templates .statsentry").clone();
     entry.click(function() { window.open(bugzilla.uiQueryUrl(translateTerms(query.args()))); });
-    entry.addClass("teamlink");
+    entry.addClass("pagelink");
     entry.find(".name").text(query.name);
     entry.find(".value").text("...");
-    $(selector).append(entry);
+    selector.append(entry);
 
     entry.find(".value").addClass("loading");
 
@@ -554,86 +533,93 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     }
   }
 
-  function teamStats(selector, teamId, isAuthenticated, forceUpdate, includeMembers) {
-    var team = require("app/teams").get()[teamId];
-    var teamEntry = $("#templates .teamentry").clone();
-    teamEntry.find(".teamname").text(team.name);
-    var table = teamEntry.find(".teamstatstable")
-    var rowTemplate = table.find(".stats-row").remove();
-    $(selector).append(teamEntry);
-    
-    var totalsRow = rowTemplate.clone();
-    totalsRow.find(".name").text("Totals");
-    var totalsStatsCell = totalsRow.find(".stats-cell");
-    table.append(totalsRow);
+  function displayIndicators(indicatorPanel, indicatorList) {
+    var count = 0;
+    var indicatorRow = null;
 
-    if (!includeMembers) {
-       totalsRow.addClass("teamlink");
-       totalsRow.click(
-        function onClick() {
-          var url = require("app/ui/hash").groupnameToHash(teamId);
-          window.open(url);
-        });
-    }
-
-    for (q in require("queries")) {
-      var member_emails = team.members.map(function(x) { return x[1]; });
-      var query = require("queries")[q](member_emails);
-      displayQuickstats(totalsStatsCell, teamId, member_emails, isAuthenticated, forceUpdate, query);
-    }
-
-    if (!includeMembers)
-      return;
-
-    for (m in team.members) {
-      var row = rowTemplate.clone();
-      row.find(".name").text(team.members[m][0]);
-      table.append(row);
-      for (q in require("queries")) {
-        var query = require("queries")[q]([team.members[m][1]]);
-        displayQuickstats(row.find(".stats-cell"), team.members[m][1], [team.members[m][1]], isAuthenticated, forceUpdate, query);
+    for (l in indicatorList) {
+      if (count++ % 7 == 0) {
+        indicatorRow = $("#templates .indicator-row").clone();
+        indicatorPanel.append(indicatorRow);
       }
+      var indicatorBox = $("#templates .indicator-box").clone();
+      var indicatorlink = indicatorBox.find(".indicatorlink");
+      indicatorlink.text(indicatorList[l].text);
+      indicatorlink.attr("href", indicatorList[l].link);
+      indicatorBox.addClass("pagelink");
+      indicatorRow.append(indicatorBox);
+    }
+  }
+  
+  function teamStats(selector, teamId, team, isAuthenticated, forceUpdate, includeMembers) {
+    var teamEntry = $("#templates .report").clone();
+    teamEntry.find(".name").text(team.name);
+    var stats = teamEntry.find(".stats");
+    selector.append(teamEntry);
+    
+    for (q in require("queries")) {
+      var member_emails = require("teams").getMembers(team).map(function(x) { return x[1]; });
+      var query = require("queries")[q](member_emails);
+      displayQuickstats(stats, teamId, member_emails, isAuthenticated, forceUpdate, query);
+    }
+
+    var indicatorPanel = teamEntry.find(".indicator-panel");
+    
+    if ("teams" in team) {
+      var indicators = [];
+      for (t in team.teams)
+        indicators.push({text: team.teams[t].short_form, link: require("app/ui/hash").groupnameToHash(teamId + "/teams/" + t)});
+      displayIndicators(indicatorPanel, indicators);
+    }
+
+    if ("members" in team) {
+      var indicators = [];
+      for (m in team.members)
+        indicators.push({text: require("teams").memberShortName(team.members[m][0]), link: require("app/ui/hash").usernameToHash(teamId + "/members/" + m)});
+      displayIndicators(indicatorPanel, indicators);
     }
   }
 
   function teamList(selector, isAuthenticated, forceUpdate) {
     var teams = require("app/teams").get();
     for (t in teams) {
-      teamStats(selector, t, isAuthenticated, forceUpdate, false);
+      teamStats(selector, t, teams[t], isAuthenticated, forceUpdate, false);
     }
   }
 
-  function userStats(selector, username, isAuthenticated, forceUpdate) {
+  function userStats(selector, username, user, isAuthenticated, forceUpdate) {
     if (username) {
-      $(selector).find("h2").addClass("loading");
+      var report = $("#templates .report").clone();
+      report.find(".name").text(user[0]);
+      var stats = report.find(".stats");
+      selector.append(report);
       xhrQueue.enqueue(
         function() {
           return bugzilla.user(
-            username,
+            user[1],
             function(response) {
-              $(selector).find("h2").removeClass("loading");
-              allQuickStats(selector, username, isAuthenticated, forceUpdate);
+              allQuickStats(stats, user[1], isAuthenticated, forceUpdate);
             },
             function(response) {
-              $(selector).find("h2").removeClass("loading");
-              $(selector).text("No such user exists!");
+              stats.text("No such user exists!");
             });
         });
     } else {
-      allQuickStats(selector, username, isAuthenticated, forceUpdate);
+      //allQuickStats(selector, username, isAuthenticated, forceUpdate);
       teamList(selector, isAuthenticated, forceUpdate);
     }
   }
 
   function update(who, isAuthenticated, forceUpdate) {
     xhrQueue.clear();
+    var container = $("#reports").find(".container");
 
-    $("#quickstats").html("");
+    container.html("");
 
     if (who.group)
-      teamStats("#quickstats", who.group, isAuthenticated, forceUpdate, true);
+      teamStats(container, who.group, require("teams").getByKey(who.group), isAuthenticated, forceUpdate, false);
     else
-      userStats("#quickstats", who.user, isAuthenticated, forceUpdate);
+      userStats(container, who.user, require("teams").getByKey(who.user), isAuthenticated, forceUpdate);
   };
 
   var refreshCommand = {

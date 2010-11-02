@@ -97,7 +97,6 @@ table, caption {
 }
 
 #reports tr {
-    border-bottom: 1px black dotted;
 }
 
 #reports th {
@@ -214,6 +213,34 @@ div.more-link:hover {
     background: #f0f0f0;
 }
 
-.teamlink {
-  cursor: pointer;
+.pagelink {
+    cursor: pointer;
+}
+
+div.indicator-panel {
+    margin-top: 10px;
+    display: table;
+    border-spacing: 10px;
+}
+
+div.indicator-row {
+    display: table-row;
+}
+
+div.indicator-box {
+    background: #33FF00;
+    display: table-cell;
+    width: 36px;
+    height: 36px;
+    text-align: center;
+    border: 1px dotted black;
+    vertical-align: middle;
+}
+
+div.indicatorlink {
+}
+
+div.report {
+    border-right: 1px black dotted;
+    padding: 10px;
 }
