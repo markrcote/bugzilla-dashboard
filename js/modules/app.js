@@ -543,9 +543,13 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         indicatorPanel.append(indicatorRow);
       }
       var indicatorBox = $("#templates .indicator-box").clone();
-      var indicatorlink = indicatorBox.find(".indicatorlink");
-      indicatorlink.text(indicatorList[l].text);
-      indicatorlink.attr("href", indicatorList[l].link);
+      var indicatorLink = indicatorBox.find(".indicatorlink");
+      indicatorLink.text(indicatorList[l].text);
+      indicatorLink.attr("href", indicatorList[l].link);
+      indicatorLink.attr("title", indicatorList[l].tip);
+      indicatorLink.tipsy({live: true});
+      // tipsy seems to hang around after we click on a link, so we have to remove it manually.
+      indicatorLink.click(function() { $.data(this, 'active.tipsy').remove(); return true; });
       indicatorBox.addClass("pagelink");
       indicatorRow.append(indicatorBox);
     }
@@ -568,14 +572,22 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     if ("teams" in team) {
       var indicators = [];
       for (t in team.teams)
-        indicators.push({text: team.teams[t].short_form, link: require("app/ui/hash").groupnameToHash(teamId + "/teams/" + t)});
+        indicators.push({
+          text: team.teams[t].short_form,
+          tip: team.teams[t].name,
+          link: require("app/ui/hash").groupnameToHash(teamId + "/teams/" + t)
+        });
       displayIndicators(indicatorPanel, indicators);
     }
 
     if ("members" in team) {
       var indicators = [];
       for (m in team.members)
-        indicators.push({text: require("teams").memberShortName(team.members[m][0]), link: require("app/ui/hash").usernameToHash(teamId + "/members/" + m)});
+        indicators.push({
+          text: require("teams").memberShortName(team.members[m][0]),
+          tip: team.members[m][0],
+          link: require("app/ui/hash").usernameToHash(teamId + "/members/" + m)
+        });
       displayIndicators(indicatorPanel, indicators);
     }
   }
