@@ -451,20 +451,108 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
   var window = require("window");
   var xhrQueue = require("xhr/queue").create();
 
+  function Report(id, name) {
+    this.id = id;
+    this.name = name;
+    this.query_count = 0;
+    
+    this.query_done = function () {
+      if (--this.query_count == 0)
+        this.name_entry.removeClass("loading");
+    }
+
+    this.setupReportDisplay = function (selector) {
+      this.entry = $("#templates .report").clone();
+      this.name_entry = this.entry.find(".name")
+      this.name_entry.text(this.name);
+      this.name_entry.addClass("loading");
+      this.stats = this.entry.find(".stats");
+      selector.append(this.entry);
+    }
+    
+    this.displayQueries = function (selector, isAuthenticated, forceUpdate) {
+      this.query_count = 0;
+      var queries = [];
+      var usernames = this.usernames();
+      for (q in require("queries")) {
+        var query = require("queries")[q](usernames);
+        if (query.requires_user && !usernames)
+          continue;
+        queries.push(query);
+        ++this.query_count;
+      }
+      for (q in queries)
+        displayQuickstats(this.stats, this.id, usernames, isAuthenticated, forceUpdate, queries[q], this.query_done, this);
+    }
+  }
+  
+  function TeamReport(teamId, team) {
+    Report.call(this, teamId, team.name);
+    this.team = team;
+    
+    this.usernames = function () {
+      return require("teams").getMembers(this.team).map(function(x) { return x[1]; });
+    }
+    
+    this.update = function (selector, isAuthenticated, forceUpdate) {
+      this.setupReportDisplay(selector);
+      this.displayQueries(selector, isAuthenticated, forceUpdate);
+      var indicatorPanel = this.entry.find(".indicator-panel");
+      
+      if ("teams" in this.team) {
+        var indicators = [];
+        for (t in this.team.teams)
+          indicators.push({
+            text: this.team.teams[t].short_form,
+            tip: this.team.teams[t].name,
+            link: require("app/ui/hash").groupnameToHash(this.id + "/teams/" + t)
+          });
+        displayIndicators(indicatorPanel, indicators);
+      }
+  
+      if ("members" in this.team) {
+        var indicators = [];
+        for (m in this.team.members)
+          indicators.push({
+            text: require("teams").memberShortName(this.team.members[m][0]),
+            tip: this.team.members[m][0],
+            link: require("app/ui/hash").usernameToHash(this.id + "/members/" + m)
+          });
+        displayIndicators(indicatorPanel, indicators);
+      }
+    }
+  }
+  TeamReport.prototype = new Report;
+
+  function UserReport(user) {
+    Report.call(this, user[1], user[0]);
+    
+    this.usernames = function () {
+      return [this.id];
+    }
+
+    this.update = function (selector, isAuthenticated, forceUpdate) {
+      this.setupReportDisplay(selector);
+      var self = this;
+      xhrQueue.enqueue(
+        function() {
+          return bugzilla.user(
+            self.id,
+            function(response) {
+              self.displayQueries(selector, isAuthenticated, forceUpdate);
+            },
+            function(response) {
+              self.stats.text("No such user exists!");
+            });
+        });
+    }
+  }
+  UserReport.prototype = new Report;
+  
   function showStats(entry, bug_count) {
     entry.find(".value").text(bug_count);
   }
   
-  function incrStats(entry, bug_count) {
-    var totalCount = 0;
-    var curCount = parseInt(entry.find(".value").text());
-    if (isNaN(curCount))
-      curCount = bug_count;
-    else
-      curCount += bug_count;
-    entry.find(".value").text(curCount);
-  }
-
   function translateTerms(args) {
     var newTerms = {};
     for (name in args)
@@ -503,7 +591,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     );
   }
 
-  function displayQuickstats(selector, cacheid, usernames, isAuthenticated, forceUpdate, query, quickStatsCb) {
+  function displayQuickstats(selector, cacheid, usernames, isAuthenticated, forceUpdate, query, quickStatsCb, cbContext) {
     var entry = $("#templates .statsentry").clone();
     entry.click(function() { window.open(bugzilla.uiQueryUrl(translateTerms(query.args()))); });
     entry.addClass("pagelink");
@@ -511,26 +599,13 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     entry.find(".value").text("...");
     selector.append(entry);
 
-    entry.find(".value").addClass("loading");
-
     quickstats(cacheid, usernames, isAuthenticated, forceUpdate, query,
       function(username, query, value) {
         showStats($(entry), value);
         if (quickStatsCb)
-          quickStatsCb(username, query, value);
-        entry.find(".value").removeClass("loading");
+          quickStatsCb.call(cbContext, username, query, value);
       }
     );
-  }
-
-  function allQuickStats(selector, username, isAuthenticated, forceUpdate) {
-    // for just one user (or no user)
-    for (q in require("queries")) {
-      var query = require("queries")[q]([username]);
-      if (query.requires_user && !username)
-        continue;
-      displayQuickstats(selector, username, [username], isAuthenticated, forceUpdate, query);
-    }
   }
 
   function displayIndicators(indicatorPanel, indicatorList) {
@@ -554,71 +629,17 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       indicatorRow.append(indicatorBox);
     }
   }
+
+  var teamReports = [];
+  var userReports = [];
   
-  function teamStats(selector, teamId, team, isAuthenticated, forceUpdate, includeMembers) {
-    var teamEntry = $("#templates .report").clone();
-    teamEntry.find(".name").text(team.name);
-    var stats = teamEntry.find(".stats");
-    selector.append(teamEntry);
-    
-    for (q in require("queries")) {
-      var member_emails = require("teams").getMembers(team).map(function(x) { return x[1]; });
-      var query = require("queries")[q](member_emails);
-      displayQuickstats(stats, teamId, member_emails, isAuthenticated, forceUpdate, query);
-    }
-
-    var indicatorPanel = teamEntry.find(".indicator-panel");
-    
-    if ("teams" in team) {
-      var indicators = [];
-      for (t in team.teams)
-        indicators.push({
-          text: team.teams[t].short_form,
-          tip: team.teams[t].name,
-          link: require("app/ui/hash").groupnameToHash(teamId + "/teams/" + t)
-        });
-      displayIndicators(indicatorPanel, indicators);
-    }
-
-    if ("members" in team) {
-      var indicators = [];
-      for (m in team.members)
-        indicators.push({
-          text: require("teams").memberShortName(team.members[m][0]),
-          tip: team.members[m][0],
-          link: require("app/ui/hash").usernameToHash(teamId + "/members/" + m)
-        });
-      displayIndicators(indicatorPanel, indicators);
-    }
-  }
-
   function teamList(selector, isAuthenticated, forceUpdate) {
     var teams = require("app/teams").get();
+    teamReports = [];
     for (t in teams) {
-      teamStats(selector, t, teams[t], isAuthenticated, forceUpdate, false);
-    }
-  }
-
-  function userStats(selector, username, user, isAuthenticated, forceUpdate) {
-    if (username) {
-      var report = $("#templates .report").clone();
-      report.find(".name").text(user[0]);
-      var stats = report.find(".stats");
-      selector.append(report);
-      xhrQueue.enqueue(
-        function() {
-          return bugzilla.user(
-            user[1],
-            function(response) {
-              allQuickStats(stats, user[1], isAuthenticated, forceUpdate);
-            },
-            function(response) {
-              stats.text("No such user exists!");
-            });
-        });
-    } else {
-      //allQuickStats(selector, username, isAuthenticated, forceUpdate);
-      teamList(selector, isAuthenticated, forceUpdate);
+      var report = new TeamReport(t, teams[t]);
+      teamReports.push(report);
+      report.update(selector, isAuthenticated, forceUpdate);
     }
   }
 
@@ -628,10 +649,18 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
 
     container.html("");
 
-    if (who.group)
-      teamStats(container, who.group, require("teams").getByKey(who.group), isAuthenticated, forceUpdate, false);
-    else
-      userStats(container, who.user, require("teams").getByKey(who.user), isAuthenticated, forceUpdate);
+    if (who.group) {
+      teamReports = [];
+      var report = new TeamReport(who.group, require("teams").getByKey(who.group));
+      teamReports.push(report);
+      report.update(container, isAuthenticated, forceUpdate);
+    } else if (who.user) {
+      userReports = [];
+      var report = new UserReport(require("teams").getByKey(who.user));
+      userReports.push(report);
+      report.update(container, isAuthenticated, forceUpdate);
+    } else
+      teamList(container, isAuthenticated, forceUpdate);
   };
 
   var refreshCommand = {
