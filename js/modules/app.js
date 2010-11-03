@@ -451,6 +451,40 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
   var window = require("window");
   var xhrQueue = require("xhr/queue").create();
 
+  function QueryRunner(cacheid, forceUpdate, usernames, queryInitCb, queryDoneCb, allDoneCb) {
+    this.usernames = usernames;
+    this.queryInitCb = queryInitCb;
+    this.queryDoneCb = queryDoneCb;
+    this.allDoneCb = allDoneCb;
+    this.queryCount = 0;
+    
+    this.queryDone = function(usernames, query, value) {
+      this.queryDoneCb(usernames, query, value);
+      if (--this.queryCount == 0)
+        this.allDoneCb();
+    }
+    
+    var queries = [];
+    
+    for (q in require("queries")) {
+      var query = require("queries")[q](usernames);
+      if (query.requires_user && !usernames)
+        continue;
+      queries.push(query);
+      ++this.queryCount;
+    }
+    var self = this;
+    for (q in queries) {
+      queryInitCb(queries[q]);
+      var cacheKey = cacheid + queries[q].id;
+      getStat(cacheKey, usernames, forceUpdate, queries[q],
+          function(usernames, query, value) {
+            self.queryDone(usernames, query, value);
+          }
+        );
+    }
+  }
+  
   function Report(id, name) {
     this.id = id;
     this.name = name;
@@ -469,20 +503,37 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       this.stats = this.entry.find(".stats");
       selector.append(this.entry);
     }
+
+    this.cleanId = function(id) {
+      return id.replace(/@/g, "").replace(/\./g, "").replace(/_/g, "").replace(/\//g, "");
+    }
+    
+    this.queryInitCb = function (query) {
+      var entry = $("#templates .statsentry").clone();
+      entry.click(function() { window.open(bugzilla.uiQueryUrl(translateTerms(query.args()))); });
+      entry.attr("id", this.cleanId(this.id + query.id));
+      entry.addClass("pagelink");
+      entry.find(".name").text(query.name);
+      entry.find(".value").text("...");
+      this.stats.append(entry);
+    }
+    
+    this.queryDoneCb = function (usernames, query, value) {
+      $("#" + this.cleanId(this.id + query.id)).find(".value").text(value);
+    }
+    
+    this.allDoneCb = function () {
+      this.name_entry.removeClass("loading");
+    }
     
     this.displayQueries = function (selector, isAuthenticated, forceUpdate) {
-      this.query_count = 0;
-      var queries = [];
-      var usernames = this.usernames();
-      for (q in require("queries")) {
-        var query = require("queries")[q](usernames);
-        if (query.requires_user && !usernames)
-          continue;
-        queries.push(query);
-        ++this.query_count;
-      }
-      for (q in queries)
-        displayQuickstats(this.stats, this.id, usernames, isAuthenticated, forceUpdate, queries[q], this.query_done, this);
+      this.selector = selector;
+      var self = this;
+      this.QueryRunner = new QueryRunner(this.id + "_" + (isAuthenticated ? "PRIVATE" : "PUBLIC") + "/",
+          forceUpdate, this.usernames(),
+          function(query) { self.queryInitCb(query); },
+          function(usernames, query, value) { self.queryDoneCb(usernames, query, value); },
+          function() { self.allDoneCb(); });
     }
   }
   
@@ -549,10 +600,6 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
   }
   UserReport.prototype = new Report;
   
-  function showStats(entry, bug_count) {
-    entry.find(".value").text(bug_count);
-  }
-  
   function translateTerms(args) {
     var newTerms = {};
     for (name in args)
@@ -560,12 +607,11 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     return newTerms;
   }
 
-  function getUserStat(cacheid, usernames, isAuthenticated, forceUpdate, query, getUserStatCb) {
+  function getStat(cacheKey, usernames, forceUpdate, query, getStatCb) {
     if (!forceUpdate) {
-      var cacheKey = cacheid + "_" + (isAuthenticated ? "PRIVATE" : "PUBLIC") + "/" + query.id;
       if (cache.haskey(cacheKey)) {
         var cached = cache.get(cacheKey);
-        getUserStatCb(usernames, query, cached);
+        getStatCb(usernames, query, cached);
         return;
       }
     }
@@ -578,34 +624,9 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
           newTerms,
           function(response) {
             cache.set(cacheKey, response.data);
-            getUserStatCb(usernames, query, response.data);
+            getStatCb(usernames, query, response.data);
           });
       });
-  }
-
-  function quickstats(cacheid, usernames, isAuthenticated, forceUpdate, query, quickStatsCb) {
-    getUserStat(cacheid, usernames, isAuthenticated, forceUpdate, query,
-      function(usernames, query, value) {
-        quickStatsCb(usernames, query, value);
-      }
-    );
-  }
-
-  function displayQuickstats(selector, cacheid, usernames, isAuthenticated, forceUpdate, query, quickStatsCb, cbContext) {
-    var entry = $("#templates .statsentry").clone();
-    entry.click(function() { window.open(bugzilla.uiQueryUrl(translateTerms(query.args()))); });
-    entry.addClass("pagelink");
-    entry.find(".name").text(query.name);
-    entry.find(".value").text("...");
-    selector.append(entry);
-
-    quickstats(cacheid, usernames, isAuthenticated, forceUpdate, query,
-      function(username, query, value) {
-        showStats($(entry), value);
-        if (quickStatsCb)
-          quickStatsCb.call(cbContext, username, query, value);
-      }
-    );
   }
 
   function displayIndicators(indicatorPanel, indicatorList) {
