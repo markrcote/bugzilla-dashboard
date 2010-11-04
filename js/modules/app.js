@@ -461,7 +461,6 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     this.id = "";
     
     this.queryDone = function(usernames, query, value) {
-      console.log("queryDone in qr " + this.id);
       this.queryDoneCb(usernames, query, value);
       this.decQueryCount();
     }
@@ -499,7 +498,6 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     this.cacheId = cacheId;
     this.indicatorBox = indicatorBox;
     this.userIds = userIds.slice(0);
-    console.log("indicatorBox id is " + this.indicatorBox.attr("id"));
     this.warn = false;
     this.err = false;
     this.stats = {};
@@ -513,7 +511,6 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     }
     
     this.queryDoneCb = function(usernames, query, value) {
-      console.log("indicatorBox id in callback is " + this.indicatorBox.attr("id"));
       this.stats[query.id].find(".value").text(value);
       if ("threshold" in query) {
         if (value > query.threshold[0] * this.userIds.length)
@@ -539,7 +536,6 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     
     this.go = function(forceUpdate) {
       var self = this;
-      console.log("indicatorBox id in go is " + this.indicatorBox.attr("id"));
       this.queryRunner = new QueryRunner(this.cacheId, forceUpdate, this.userIds,
           function(query) { return self.queryInitCb(query); },
           function(usernames, query, value) { self.queryDoneCb(usernames, query, value); },
@@ -669,8 +665,6 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         indicatorBox.click(function() { $.data(this, 'active.tipsy').remove(); window.open($(this).attr("link")); return false; });
         indicatorBox.addClass("pagelink");
         if ("usernames" in indicatorList[l]) {
-          console.log("loading indicator for ");
-          console.dir(indicatorList[l].usernames);
           var indicatorLoader = new IndicatorLoader(indicatorList[l].cacheId, indicatorList[l].usernames, indicatorBox);
           indicatorLoaders.push(indicatorLoader);
           indicatorLoader.go(forceUpdate);
