@@ -450,16 +450,23 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
   var bugzilla = require("bugzilla");
   var window = require("window");
   var xhrQueue = require("xhr/queue").create();
+  var isAuthenticated = false;  // set by update()
 
   function QueryRunner(cacheid, forceUpdate, usernames, queryInitCb, queryDoneCb, allDoneCb) {
-    this.usernames = usernames;
+    this.usernames = usernames.slice(0);
     this.queryInitCb = queryInitCb;
     this.queryDoneCb = queryDoneCb;
     this.allDoneCb = allDoneCb;
     this.queryCount = 0;
+    this.id = "";
     
     this.queryDone = function(usernames, query, value) {
+      console.log("queryDone in qr " + this.id);
       this.queryDoneCb(usernames, query, value);
+      this.decQueryCount();
+    }
+    
+    this.decQueryCount = function() {
       if (--this.queryCount == 0)
         this.allDoneCb();
     }
@@ -467,17 +474,20 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     var queries = [];
     
     for (q in require("queries")) {
-      var query = require("queries")[q](usernames);
-      if (query.requires_user && !usernames)
+      var query = require("queries")[q](this.usernames);
+      if (query.requires_user && !this.usernames)
         continue;
       queries.push(query);
       ++this.queryCount;
     }
     var self = this;
     for (q in queries) {
-      queryInitCb(queries[q]);
+      if (!this.queryInitCb(queries[q])) {
+        this.decQueryCount();
+        continue;
+      }
       var cacheKey = cacheid + queries[q].id;
-      getStat(cacheKey, usernames, forceUpdate, queries[q],
+      getStat(cacheKey, this.usernames, forceUpdate, queries[q],
           function(usernames, query, value) {
             self.queryDone(usernames, query, value);
           }
@@ -485,10 +495,68 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     }
   }
   
+  function IndicatorLoader(cacheId, userIds, indicatorBox) {
+    this.cacheId = cacheId;
+    this.indicatorBox = indicatorBox;
+    this.userIds = userIds.slice(0);
+    console.log("indicatorBox id is " + this.indicatorBox.attr("id"));
+    this.warn = false;
+    this.err = false;
+    this.stats = {};
+    
+    this.queryInitCb = function (query) {
+      this.stats[query.id] = $("#templates .indicator-stat").clone();
+      this.stats[query.id].find(".name").text(query.short_form);
+      this.stats[query.id].find(".value").text("...");
+      this.indicatorBox.append(this.stats[query.id]);
+      return true;
+    }
+    
+    this.queryDoneCb = function(usernames, query, value) {
+      console.log("indicatorBox id in callback is " + this.indicatorBox.attr("id"));
+      this.stats[query.id].find(".value").text(value);
+      if ("threshold" in query) {
+        if (value > query.threshold[0] * this.userIds.length)
+          this.err = true;
+        else if (value > query.threshold[1] * this.userIds.length)
+          this.warn = true;
+      }
+    }
+    
+    this.allDoneCb = function() {
+      this.indicatorBox.removeClass("indicatorOk");
+      this.indicatorBox.removeClass("indicatorWarn");
+      this.indicatorBox.removeClass("indicatorErr");
+      
+      if (this.err)
+        this.indicatorBox.addClass("indicatorErr");
+      else if (this.warn)
+        this.indicatorBox.addClass("indicatorWarn");
+      else
+        this.indicatorBox.addClass("indicatorOk");
+    }
+    
+    this.go = function(forceUpdate) {
+      var self = this;
+      console.log("indicatorBox id in go is " + this.indicatorBox.attr("id"));
+      this.queryRunner = new QueryRunner(this.cacheId, forceUpdate, this.userIds,
+          function(query) { return self.queryInitCb(query); },
+          function(usernames, query, value) { self.queryDoneCb(usernames, query, value); },
+          function() { self.allDoneCb(); });
+      this.queryRunner.id = this.indicatorBox.attr("id");
+    }
+  }
+  
   function Report(id, name) {
     this.id = id;
     this.name = name;
     this.query_count = 0;
+    
+    this.cacheId = function (id) {
+      if (!id)
+        id = this.id;
+      return id + "_" + (isAuthenticated ? "PRIVATE" : "PUBLIC") + "/";
+    }
     
     this.query_done = function () {
       if (--this.query_count == 0)
@@ -516,6 +584,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       entry.find(".name").text(query.name);
       entry.find(".value").text("...");
       this.stats.append(entry);
+      return true;
     }
     
     this.queryDoneCb = function (usernames, query, value) {
@@ -526,12 +595,12 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       this.name_entry.removeClass("loading");
     }
     
-    this.displayQueries = function (selector, isAuthenticated, forceUpdate) {
+    this.displayQueries = function (selector, forceUpdate) {
       this.selector = selector;
       var self = this;
-      this.QueryRunner = new QueryRunner(this.id + "_" + (isAuthenticated ? "PRIVATE" : "PUBLIC") + "/",
+      this.QueryRunner = new QueryRunner(this.cacheId(),
           forceUpdate, this.usernames(),
-          function(query) { self.queryInitCb(query); },
+          function(query) { return self.queryInitCb(query); },
           function(usernames, query, value) { self.queryDoneCb(usernames, query, value); },
           function() { self.allDoneCb(); });
     }
@@ -540,14 +609,15 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
   function TeamReport(teamId, team) {
     Report.call(this, teamId, team.name);
     this.team = team;
+    this.indicatorLoaders = [];
     
     this.usernames = function () {
       return require("teams").getMembers(this.team).map(function(x) { return x[1]; });
     }
     
-    this.update = function (selector, isAuthenticated, forceUpdate) {
+    this.update = function (selector, forceUpdate) {
       this.setupReportDisplay(selector);
-      this.displayQueries(selector, isAuthenticated, forceUpdate);
+      this.displayQueries(selector, forceUpdate);
       var indicatorPanel = this.entry.find(".indicator-panel");
       
       if ("teams" in this.team) {
@@ -556,20 +626,54 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
           indicators.push({
             text: this.team.teams[t].short_form,
             tip: this.team.teams[t].name,
-            link: require("app/ui/hash").groupnameToHash(this.id + "/teams/" + t)
+            link: require("app/ui/hash").groupnameToHash(this.id + "/teams/" + t),
+            usernames: require("teams").getMembers(this.team.teams[t]).map(function(x) { return x[1]; }),
+            cacheId: this.cacheId(this.id + "/teams/" + t)
           });
-        displayIndicators(indicatorPanel, indicators);
+        displayIndicators(indicatorPanel, indicators, this.indicatorLoaders, forceUpdate);
       }
   
       if ("members" in this.team) {
         var indicators = [];
+        this.indicatorLoaders = [];
         for (m in this.team.members)
           indicators.push({
             text: require("teams").memberShortName(this.team.members[m][0]),
             tip: this.team.members[m][0],
-            link: require("app/ui/hash").usernameToHash(this.id + "/members/" + m)
+            link: require("app/ui/hash").usernameToHash(this.id + "/members/" + m),
+            usernames: [this.team.members[m][1]],
+            cacheId: this.cacheId(this.team.members[m][1])
           });
-        displayIndicators(indicatorPanel, indicators);
+        displayIndicators(indicatorPanel, indicators, this.indicatorLoaders, forceUpdate);
+      }
+    }
+
+    function displayIndicators(indicatorPanel, indicatorList, indicatorLoaders, forceUpdate) {
+      var count = 0;
+      var indicatorRow = null;
+
+      for (l in indicatorList) {
+        if (count++ % 3 == 0) {
+          indicatorRow = $("#templates .indicator-row").clone();
+          indicatorPanel.append(indicatorRow);
+        }
+        var indicatorBox = $("#templates .indicator-box").clone();
+        indicatorBox.attr("id", "ind" + count);
+        indicatorBox.find(".title").text(indicatorList[l].text);
+        indicatorBox.attr("link", indicatorList[l].link);
+        indicatorBox.attr("title", indicatorList[l].tip);
+        indicatorBox.tipsy();
+        // tipsy seems to hang around after we click on a link, so we have to remove it manually.
+        indicatorBox.click(function() { $.data(this, 'active.tipsy').remove(); window.open($(this).attr("link")); return false; });
+        indicatorBox.addClass("pagelink");
+        if ("usernames" in indicatorList[l]) {
+          console.log("loading indicator for ");
+          console.dir(indicatorList[l].usernames);
+          var indicatorLoader = new IndicatorLoader(indicatorList[l].cacheId, indicatorList[l].usernames, indicatorBox);
+          indicatorLoaders.push(indicatorLoader);
+          indicatorLoader.go(forceUpdate);
+        }
+        indicatorRow.append(indicatorBox);
       }
     }
   }
@@ -582,7 +686,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       return [this.id];
     }
 
-    this.update = function (selector, isAuthenticated, forceUpdate) {
+    this.update = function (selector, forceUpdate) {
       this.setupReportDisplay(selector);
       var self = this;
       xhrQueue.enqueue(
@@ -590,7 +694,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
           return bugzilla.user(
             self.id,
             function(response) {
-              self.displayQueries(selector, isAuthenticated, forceUpdate);
+              self.displayQueries(selector, forceUpdate);
             },
             function(response) {
               self.stats.text("No such user exists!");
@@ -629,43 +733,23 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       });
   }
 
-  function displayIndicators(indicatorPanel, indicatorList) {
-    var count = 0;
-    var indicatorRow = null;
-
-    for (l in indicatorList) {
-      if (count++ % 7 == 0) {
-        indicatorRow = $("#templates .indicator-row").clone();
-        indicatorPanel.append(indicatorRow);
-      }
-      var indicatorBox = $("#templates .indicator-box").clone();
-      var indicatorLink = indicatorBox.find(".indicatorlink");
-      indicatorLink.text(indicatorList[l].text);
-      indicatorLink.attr("href", indicatorList[l].link);
-      indicatorLink.attr("title", indicatorList[l].tip);
-      indicatorLink.tipsy({live: true});
-      // tipsy seems to hang around after we click on a link, so we have to remove it manually.
-      indicatorLink.click(function() { $.data(this, 'active.tipsy').remove(); return true; });
-      indicatorBox.addClass("pagelink");
-      indicatorRow.append(indicatorBox);
-    }
-  }
 
   var teamReports = [];
   var userReports = [];
   
-  function teamList(selector, isAuthenticated, forceUpdate) {
+  function teamList(selector, forceUpdate) {
     var teams = require("app/teams").get();
     teamReports = [];
     for (t in teams) {
       var report = new TeamReport(t, teams[t]);
       teamReports.push(report);
-      report.update(selector, isAuthenticated, forceUpdate);
+      report.update(selector, forceUpdate);
     }
   }
 
-  function update(who, isAuthenticated, forceUpdate) {
+  function update(who, _isAuthenticated, forceUpdate) {
     xhrQueue.clear();
+    isAuthenticated = _isAuthenticated;
     var container = $("#reports").find(".container");
 
     container.html("");
@@ -674,14 +758,14 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       teamReports = [];
       var report = new TeamReport(who.group, require("teams").getByKey(who.group));
       teamReports.push(report);
-      report.update(container, isAuthenticated, forceUpdate);
+      report.update(container, forceUpdate);
     } else if (who.user) {
       userReports = [];
       var report = new UserReport(require("teams").getByKey(who.user));
       userReports.push(report);
-      report.update(container, isAuthenticated, forceUpdate);
+      report.update(container, forceUpdate);
     } else
-      teamList(container, isAuthenticated, forceUpdate);
+      teamList(container, forceUpdate);
   };
 
   var refreshCommand = {

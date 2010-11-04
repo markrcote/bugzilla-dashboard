@@ -40,6 +40,7 @@ Require.modules["queries"] = function(exports, require) {
     return {
       id: 'open_blockers',
       name: 'Open blockers',
+      short_form: "+'s",
       requires_user: false,
       args: function() {
         var a = {
@@ -50,11 +51,13 @@ Require.modules["queries"] = function(exports, require) {
       }
     };
   };
+  /*
   exports.open_noms = function(usernames) {
     return {
       id: 'open_noms',
       name: 'Blocker nominations',
       requires_user: false,
+      threshold: [50, 25],
       args: function() {
         var a = {
           resolution: '---',
@@ -66,10 +69,12 @@ Require.modules["queries"] = function(exports, require) {
       }
     };
   };
+  */
   exports.regressions = function(usernames) {
     return {
       id: 'regressions',
       name: 'Open regression blockers',
+      short_form: "Reg",
       requires_user: false,
       args: function() {
         var a = {
@@ -87,6 +92,7 @@ Require.modules["queries"] = function(exports, require) {
     return {
       id: 'patches_awaiting_review',
       name: 'Patches awaiting review',
+      short_form: "P",
       requires_user: true,
       args: function() {
         // username is mandatory
@@ -104,7 +110,9 @@ Require.modules["queries"] = function(exports, require) {
     return {
       id: 'review_queue',
       name: 'Review queue',
+      short_form: "RQ",
       requires_user: true,
+      threshold: [15, 8],
       args: function() {
         var a = {
           resolution: "---"
@@ -118,6 +126,7 @@ Require.modules["queries"] = function(exports, require) {
     return {
       id: 'crashers',
       name: 'Crasher blockers',
+      short_form: "Crash",
       requires_user: false,
       args: function() {
         var a = {
@@ -135,6 +144,7 @@ Require.modules["queries"] = function(exports, require) {
     return {
       id: 'security',
       name: 'Security blockers',
+      short_form: "sg",
       requires_user: false,
       args: function() {
         var a = {
@@ -155,6 +165,7 @@ Require.modules["queries"] = function(exports, require) {
     return {
       id: 'blockers_fixed_30_days',
       name: 'Blockers fixed in the last 30 days',
+      short_form: "+'s -30d",
       requires_user: false,
       args: function() {
         var a = {
@@ -173,6 +184,7 @@ Require.modules["queries"] = function(exports, require) {
     return {
       id: 'nonblockers_fixed_30_days',
       name: 'Nonblockers fixed in the last 30 days',
+      short_form: "Non-+ -30d",
       requires_user: false,
       args: function() {
         var a = {

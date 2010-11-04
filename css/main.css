@@ -228,13 +228,24 @@ div.indicator-row {
 }
 
 div.indicator-box {
-    background: #33cc33;
     display: table-cell;
-    width: 36px;
-    height: 36px;
+    width: 90px;
+    height: 90px;
     text-align: center;
-    border: 3px outset black;
+    border: 4px outset black;
     vertical-align: middle;
+}
+
+div.indicatorOk {
+    background: #33cc33;
+}
+
+div.indicatorWarn {
+    background: #ffff33;
+}
+
+div.indicatorErr {
+    background: #cc3333;
 }
 
 div.indicatorlink {
