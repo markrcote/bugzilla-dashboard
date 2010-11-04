@@ -452,22 +452,87 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
   var xhrQueue = require("xhr/queue").create();
   var isAuthenticated = false;  // set by update()
 
-  function QueryRunner(cacheid, forceUpdate, usernames, queryInitCb, queryDoneCb, allDoneCb) {
+  function QueryRunner(forceUpdate, usernames, queryInitCb, queryDoneCb, allDoneCb) {
+    // FIXME: Could probably split this into another object per query.
     this.usernames = usernames.slice(0);
     this.queryInitCb = queryInitCb;
     this.queryDoneCb = queryDoneCb;
     this.allDoneCb = allDoneCb;
     this.queryCount = 0;
     this.id = "";
+    this.results = {};
     
-    this.queryDone = function(usernames, query, value) {
-      this.queryDoneCb(usernames, query, value);
+    this.queryDone = function(usernames, query) {
+      for (u in this.results[query.id]) {
+        var cacheKey = this.cacheId(u, query);
+        cache.set(cacheKey, this.results[query.id][u]);
+      }
+      this.queryDoneCb(usernames, query, this.results);
       this.decQueryCount();
     }
     
     this.decQueryCount = function() {
       if (--this.queryCount == 0)
-        this.allDoneCb();
+        this.allDoneCb(this.results);
+    }
+
+    this.cacheId = function(username, query) {
+      return username + "_" + (isAuthenticated ? "PRIVATE" : "PUBLIC") + "/" + query.id;
+    }
+    
+    this.parseResults = function(query, response) {
+      if ("get_values" in query)
+        query.get_values(this.results[query.id], response);
+      else {
+        for (b in response.bugs) {
+          var username = response.bugs[b][query.username_field]["name"];
+          if (username) {
+            for (u in this.results[query.id]) {
+              if (u.slice(0, username.length) == username) {
+                this.results[query.id][u]++;
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    this.getStat = function(usernames, forceUpdate, query, getStatCb) {
+      this.results[query.id] = {};
+      for (u in usernames)
+        this.results[query.id][usernames[u]] = 0;
+
+      var uncachedUsernames = [];
+      for (u in usernames) {
+        var cacheKey = this.cacheId(usernames[u], query);
+        if (!forceUpdate && cache.haskey(cacheKey)) {
+          this.results[query.id][usernames[u]] = cache.get(this.cacheId(usernames[u], query));
+        }
+        else
+          uncachedUsernames.push(usernames[u]);
+      }
+      
+      if (uncachedUsernames.length == 0) {
+        this.queryDone(usernames, query);
+        return;
+      }
+      
+      var args = query.args(uncachedUsernames);
+      if ("include_fields" in query)
+        args.include_fields = query.include_fields;
+      var newTerms = translateTerms(args);
+
+      var self = this;
+      xhrQueue.enqueue(
+        function() {
+          return bugzilla.search(
+            newTerms,
+            function(response) {
+              self.parseResults(query, response);
+              self.queryDone(usernames, query);
+            });
+        });
     }
     
     var queries = [];
@@ -481,12 +546,11 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     }
     var self = this;
     for (q in queries) {
-      if (!this.queryInitCb(queries[q])) {
+      if (!this.queryInitCb(this.usernames, queries[q])) {
         this.decQueryCount();
         continue;
       }
-      var cacheKey = cacheid + queries[q].id;
-      getStat(cacheKey, this.usernames, forceUpdate, queries[q],
+      this.getStat(this.usernames, forceUpdate, queries[q],
           function(usernames, query, value) {
             self.queryDone(usernames, query, value);
           }
@@ -494,15 +558,14 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     }
   }
   
-  function IndicatorLoader(cacheId, userIds, indicatorBox) {
-    this.cacheId = cacheId;
+  function IndicatorLoader(userIds, indicatorBox) {
     this.indicatorBox = indicatorBox;
     this.userIds = userIds.slice(0);
     this.warn = false;
     this.err = false;
     this.stats = {};
     
-    this.queryInitCb = function (query) {
+    this.queryInitCb = function (usernames, query) {
       this.stats[query.id] = $("#templates .indicator-stat").clone();
       this.stats[query.id].find(".name").text(query.short_form);
       this.stats[query.id].find(".value").text("...");
@@ -510,12 +573,15 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       return true;
     }
     
-    this.queryDoneCb = function(usernames, query, value) {
-      this.stats[query.id].find(".value").text(value);
+    this.queryDoneCb = function(usernames, query, results) {
+      var total = 0;
+      for (u in results[query.id])
+        total += results[query.id][u];
+      this.stats[query.id].find(".value").text(total);
       if ("threshold" in query) {
-        if (value > query.threshold[0] * this.userIds.length)
+        if (total > query.threshold[0] * this.userIds.length)
           this.err = true;
-        else if (value > query.threshold[1] * this.userIds.length)
+        else if (total > query.threshold[1] * this.userIds.length)
           this.warn = true;
       }
     }
@@ -536,8 +602,8 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     
     this.go = function(forceUpdate) {
       var self = this;
-      this.queryRunner = new QueryRunner(this.cacheId, forceUpdate, this.userIds,
-          function(query) { return self.queryInitCb(query); },
+      this.queryRunner = new QueryRunner(forceUpdate, this.userIds,
+          function(usernames, query) { return self.queryInitCb(usernames, query); },
           function(usernames, query, value) { self.queryDoneCb(usernames, query, value); },
           function() { self.allDoneCb(); });
       this.queryRunner.id = this.indicatorBox.attr("id");
@@ -548,12 +614,6 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     this.id = id;
     this.name = name;
     this.query_count = 0;
-    
-    this.cacheId = function (id) {
-      if (!id)
-        id = this.id;
-      return id + "_" + (isAuthenticated ? "PRIVATE" : "PUBLIC") + "/";
-    }
     
     this.query_done = function () {
       if (--this.query_count == 0)
@@ -573,9 +633,9 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       return id.replace(/@/g, "").replace(/\./g, "").replace(/_/g, "").replace(/\//g, "");
     }
     
-    this.queryInitCb = function (query) {
+    this.queryInitCb = function (usernames, query) {
       var entry = $("#templates .statsentry").clone();
-      entry.click(function() { window.open(bugzilla.uiQueryUrl(translateTerms(query.args()))); });
+      entry.click(function() { window.open(bugzilla.uiQueryUrl(translateTerms(query.args(usernames)))); });
       entry.attr("id", this.cleanId(this.id + query.id));
       entry.addClass("pagelink");
       entry.find(".name").text(query.name);
@@ -584,22 +644,26 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       return true;
     }
     
-    this.queryDoneCb = function (usernames, query, value) {
-      $("#" + this.cleanId(this.id + query.id)).find(".value").text(value);
+    this.queryDoneCb = function (usernames, query, results) {
+      var total = 0;
+      for (u in results[query.id])
+        total += results[query.id][u];
+      $("#" + this.cleanId(this.id + query.id)).find(".value").text(total);
     }
     
-    this.allDoneCb = function () {
+    this.allDoneCb = function(cb) {
       this.name_entry.removeClass("loading");
+      if (cb)
+        cb();
     }
     
-    this.displayQueries = function (selector, forceUpdate) {
+    this.displayQueries = function (selector, forceUpdate, cb) {
       this.selector = selector;
       var self = this;
-      this.QueryRunner = new QueryRunner(this.cacheId(),
-          forceUpdate, this.usernames(),
-          function(query) { return self.queryInitCb(query); },
+      this.QueryRunner = new QueryRunner(forceUpdate, this.usernames(),
+          function(usernames, query) { return self.queryInitCb(usernames, query); },
           function(usernames, query, value) { self.queryDoneCb(usernames, query, value); },
-          function() { self.allDoneCb(); });
+          function() { self.allDoneCb(cb); });
     }
   }
   
@@ -612,9 +676,15 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       return require("teams").getMembers(this.team).map(function(x) { return x[1]; });
     }
     
+    this._allDoneCb = function () {
+      for (i in this.indicatorLoaders)
+        this.indicatorLoaders[i].go(false);
+    }
+    
     this.update = function (selector, forceUpdate) {
+      this.indicatorLoaders = [];
       this.setupReportDisplay(selector);
-      this.displayQueries(selector, forceUpdate);
+      var self = this;
       var indicatorPanel = this.entry.find(".indicator-panel");
       
       if ("teams" in this.team) {
@@ -624,28 +694,27 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
             text: this.team.teams[t].short_form,
             tip: this.team.teams[t].name,
             link: require("app/ui/hash").groupnameToHash(this.id + "/teams/" + t),
-            usernames: require("teams").getMembers(this.team.teams[t]).map(function(x) { return x[1]; }),
-            cacheId: this.cacheId(this.id + "/teams/" + t)
+            usernames: require("teams").getMembers(this.team.teams[t]).map(function(x) { return x[1]; })
           });
-        displayIndicators(indicatorPanel, indicators, this.indicatorLoaders, forceUpdate);
+        this.displayIndicators(indicatorPanel, indicators);
       }
   
       if ("members" in this.team) {
         var indicators = [];
-        this.indicatorLoaders = [];
         for (m in this.team.members)
           indicators.push({
             text: require("teams").memberShortName(this.team.members[m][0]),
             tip: this.team.members[m][0],
             link: require("app/ui/hash").usernameToHash(this.id + "/members/" + m),
-            usernames: [this.team.members[m][1]],
-            cacheId: this.cacheId(this.team.members[m][1])
+            usernames: [this.team.members[m][1]]
           });
-        displayIndicators(indicatorPanel, indicators, this.indicatorLoaders, forceUpdate);
+        this.displayIndicators(indicatorPanel, indicators);
       }
+
+      this.displayQueries(selector, forceUpdate, function() { self._allDoneCb() });
     }
 
-    function displayIndicators(indicatorPanel, indicatorList, indicatorLoaders, forceUpdate) {
+    this.displayIndicators = function (indicatorPanel, indicatorList) {
       var count = 0;
       var indicatorRow = null;
 
@@ -665,9 +734,8 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         indicatorBox.click(function() { $.data(this, 'active.tipsy').remove(); window.open($(this).attr("link")); return false; });
         indicatorBox.addClass("pagelink");
         if ("usernames" in indicatorList[l]) {
-          var indicatorLoader = new IndicatorLoader(indicatorList[l].cacheId, indicatorList[l].usernames, indicatorBox);
-          indicatorLoaders.push(indicatorLoader);
-          indicatorLoader.go(forceUpdate);
+          var indicatorLoader = new IndicatorLoader(indicatorList[l].usernames, indicatorBox);
+          this.indicatorLoaders.push(indicatorLoader);
         }
         indicatorRow.append(indicatorBox);
       }
@@ -682,6 +750,10 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       return [this.id];
     }
 
+    this._allDoneCb = function () {
+      this.name_entry.removeClass("loading");
+    }
+    
     this.update = function (selector, forceUpdate) {
       this.setupReportDisplay(selector);
       var self = this;
@@ -706,29 +778,6 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       newTerms[name.replace(/_DOT_/g, ".").replace(/_HYPH_/g, "-")] = args[name];
     return newTerms;
   }
-
-  function getStat(cacheKey, usernames, forceUpdate, query, getStatCb) {
-    if (!forceUpdate) {
-      if (cache.haskey(cacheKey)) {
-        var cached = cache.get(cacheKey);
-        getStatCb(usernames, query, cached);
-        return;
-      }
-    }
-
-    var newTerms = translateTerms(query.args());
-
-    xhrQueue.enqueue(
-      function() {
-        return bugzilla.count(
-          newTerms,
-          function(response) {
-            cache.set(cacheKey, response.data);
-            getStatCb(usernames, query, response.data);
-          });
-      });
-  }
-
 
   var teamReports = [];
   var userReports = [];

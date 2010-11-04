@@ -36,13 +36,35 @@ Require.modules["queries"] = function(exports, require) {
     return args;
   }
 
-  exports.open_blockers = function(usernames) {
+  function searchReviews(review_field, query_results, response) {
+    for (b in response.bugs) {
+      for (a in response.bugs[b].attachments) {
+        for (f in response.bugs[b].attachments[a].flags) {
+          if (response.bugs[b].attachments[a].flags[f].name.indexOf("review") != -1 &&
+              response.bugs[b].attachments[a].flags[f].status == "?") {
+            var reviewValue = response.bugs[b].attachments[a].flags[f][review_field].name;
+            if (!reviewValue)
+              continue;
+            for (u in query_results) {
+              if (u.slice(0, reviewValue.length) == reviewValue) {
+                query_results[u]++;
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  exports.open_blockers = function() {
     return {
       id: 'open_blockers',
       name: 'Open blockers',
       short_form: "+'s",
       requires_user: false,
-      args: function() {
+      username_field: "assigned_to",
+      args: function(usernames) {
         var a = {
           resolution: '---'
         };
@@ -51,14 +73,16 @@ Require.modules["queries"] = function(exports, require) {
       }
     };
   };
+
   /*
-  exports.open_noms = function(usernames) {
+  exports.open_noms = function() {
     return {
       id: 'open_noms',
       name: 'Blocker nominations',
       requires_user: false,
       threshold: [50, 25],
-      args: function() {
+      username_field: "assigned_to",
+      args: function(usernames) {
         var a = {
           resolution: '---',
           field0_HYPH_0_HYPH_0: 'cf_blocking_20',
@@ -70,13 +94,15 @@ Require.modules["queries"] = function(exports, require) {
     };
   };
   */
-  exports.regressions = function(usernames) {
+
+  exports.regressions = function() {
     return {
       id: 'regressions',
       name: 'Open regression blockers',
       short_form: "Reg",
       requires_user: false,
-      args: function() {
+      username_field: "assigned_to",
+      args: function(usernames) {
         var a = {
           resolution: '---',
           field0_HYPH_0_HYPH_0: 'keywords',
@@ -88,13 +114,15 @@ Require.modules["queries"] = function(exports, require) {
       }
     };
   };
-  exports.patches_awaiting_review = function(usernames) {
+
+  exports.patches_awaiting_review = function() {
     return {
       id: 'patches_awaiting_review',
       name: 'Patches awaiting review',
       short_form: "P",
       requires_user: true,
-      args: function() {
+      include_fields: "attachments",
+      args: function(usernames) {
         // username is mandatory
         var a = {
           resolution: "---",
@@ -103,32 +131,42 @@ Require.modules["queries"] = function(exports, require) {
           value0_HYPH_0_HYPH_0: "review?"
         };
         return addUserQuery("setters.login_name", "substring", a, 1, usernames);
+      },
+      get_values: function(query_results, response) {
+        searchReviews("setter", query_results, response);
       }
     };
   };
-  exports.review_queue = function(usernames) {
+
+  exports.review_queue = function() {
     return {
       id: 'review_queue',
       name: 'Review queue',
       short_form: "RQ",
       requires_user: true,
       threshold: [15, 8],
-      args: function() {
+      include_fields: "attachments",
+      args: function(usernames) {
         var a = {
           resolution: "---"
         };
         // REST API is flag.requestee
         return addUserQuery("requestees.login_name", "equals", a, 0, usernames);
+      },
+      get_values: function(query_results, response) {
+        searchReviews("requestee", query_results, response);
       }
     };
   };
-  exports.crashers = function(usernames) {
+
+  exports.crashers = function() {
     return {
       id: 'crashers',
       name: 'Crasher blockers',
       short_form: "Crash",
       requires_user: false,
-      args: function() {
+      username_field: "assigned_to",
+      args: function(usernames) {
         var a = {
           resolution: '---',
           field0_HYPH_0_HYPH_0: 'keywords',
@@ -140,13 +178,15 @@ Require.modules["queries"] = function(exports, require) {
       }
     };
   };
-  exports.security = function(usernames) {
+
+  exports.security = function() {
     return {
       id: 'security',
       name: 'Security blockers',
       short_form: "sg",
       requires_user: false,
-      args: function() {
+      username_field: "assigned_to",
+      args: function(usernames) {
         var a = {
           resolution: '---',
           field0_HYPH_0_HYPH_0: 'component',
@@ -161,13 +201,15 @@ Require.modules["queries"] = function(exports, require) {
       }
     };
   };
-  exports.blockers_fixed_30_days = function(usernames) {
+
+  exports.blockers_fixed_30_days = function() {
     return {
       id: 'blockers_fixed_30_days',
       name: 'Blockers fixed in the last 30 days',
       short_form: "+'s -30d",
       requires_user: false,
-      args: function() {
+      username_field: "assigned_to",
+      args: function(usernames) {
         var a = {
           resolution: 'FIXED',
           changed_field: 'resolution',
@@ -180,13 +222,15 @@ Require.modules["queries"] = function(exports, require) {
       }
     };
   };
-  exports.nonblockers_fixed_30_days = function(usernames) {
+
+  exports.nonblockers_fixed_30_days = function() {
     return {
       id: 'nonblockers_fixed_30_days',
       name: 'Nonblockers fixed in the last 30 days',
       short_form: "Non-+ -30d",
       requires_user: false,
-      args: function() {
+      username_field: "assigned_to",
+      args: function(usernames) {
         var a = {
           resolution: 'FIXED',
           changed_field: 'resolution',
