@@ -524,6 +524,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     }
     
     this.allDoneCb = function() {
+      this.indicatorBox.removeClass("indicatorLoading");
       this.indicatorBox.removeClass("indicatorOk");
       this.indicatorBox.removeClass("indicatorWarn");
       this.indicatorBox.removeClass("indicatorErr");
@@ -658,6 +659,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
           indicatorPanel.append(indicatorRow);
         }
         var indicatorBox = $("#templates .indicator-box").clone();
+        indicatorBox.addClass("indicatorLoading");
         indicatorBox.attr("id", "ind" + count);
         indicatorBox.find(".title").text(indicatorList[l].text);
         indicatorBox.attr("link", indicatorList[l].link);

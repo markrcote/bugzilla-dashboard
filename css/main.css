@@ -236,6 +236,10 @@ div.indicator-box {
     vertical-align: middle;
 }
 
+div.indicatorLoading {
+    background: #f0f0f0;
+}
+
 div.indicatorOk {
     background: #33cc33;
 }
