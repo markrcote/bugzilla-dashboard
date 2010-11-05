@@ -669,8 +669,6 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     }
     
     this.allDoneCb = function() {
-      var d = new Date();
-      console.log("report " + name + " finished: " + (d.getTime() - startTime));
       this.name_entry.removeClass("loading");
     }
     
