@@ -815,6 +815,11 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     xhrQueue.clear();
     isAuthenticated = _isAuthenticated;
     var container = $("#reports").find(".container");
+    var title = require("queries").RELEASE_NAME + " Bugzilla Dashboard";
+    if (document.title != title) {
+      document.title = title;
+      $("#header .title").text(title);
+    }
 
     container.html("");
 

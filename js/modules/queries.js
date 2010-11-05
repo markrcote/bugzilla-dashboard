@@ -58,6 +58,9 @@ Require.modules["queries"] = function(exports, require) {
   }
   
   exports.DEFAULT_PRIORITY = 5;
+  
+  exports.RELEASE_NAME = "Firefox 4 beta 7";
+  var blockingVer = "20";
 
   exports.queries = {
     open_blockers: function() {
@@ -87,7 +90,7 @@ Require.modules["queries"] = function(exports, require) {
       args: function(usernames) {
         var a = {
           resolution: '---',
-          field0_HYPH_0_HYPH_0: 'cf_blocking_20',
+          field0_HYPH_0_HYPH_0: 'cf_blocking_' + blockingVer',
           type0_HYPH_0_HYPH_0: 'equals',
           value0_HYPH_0_HYPH_0: '?',
         };
@@ -193,10 +196,10 @@ Require.modules["queries"] = function(exports, require) {
           changed_field_to: 'FIXED',
           changed_before: 'Now',
           changed_after: require("date-utils").timeAgo(MS_PER_DAY * 30),
-          field0_HYPH_0_HYPH_0: 'cf_blocking_20',
+          field0_HYPH_0_HYPH_0: 'cf_blocking_' + blockingVer,
           type0_HYPH_0_HYPH_0: 'notsubstring',
           value0_HYPH_0_HYPH_0: 'final',
-          field0_HYPH_1_HYPH_0: 'cf_blocking_20',
+          field0_HYPH_1_HYPH_0: 'cf_blocking_' + blockingVer,
           type0_HYPH_1_HYPH_0: 'notsubstring',
           value0_HYPH_1_HYPH_0: 'beta'
         };
