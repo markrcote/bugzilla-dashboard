@@ -520,6 +520,11 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         return;
       }
       **/
+      
+      if (usernames.length == 0) {
+        this.queryDone(usernames, query);
+        return;
+      }
 
       if (!forceUpdate) {
         var cacheKey = this.cacheId(usernames, query);
@@ -692,7 +697,11 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     this.update = function (selector, forceUpdate) {
       this.indicatorLoaders = [];
       this.setupReportDisplay(selector);
+      this.name_entry.addClass("pagelink");
+      var self = this;
+      this.name_entry.click(function() { window.open(require("app/ui/hash").groupnameToHash(self.id)) });
       this.displayQueries(selector, forceUpdate);
+      /*
       var indicatorPanel = this.entry.find(".indicator-panel");
       
       if ("teams" in this.team) {
@@ -721,6 +730,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
 
       for (i in this.indicatorLoaders)
         this.indicatorLoaders[i].go(forceUpdate);
+      */
     }
 
     this.displayIndicators = function (indicatorPanel, indicatorList) {

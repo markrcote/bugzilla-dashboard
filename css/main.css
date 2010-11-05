@@ -58,20 +58,22 @@ a:hover {
 
 #reports .container {
     display: table;
-}
-
-#reports .container > div:first-child {
-    padding: 0;
+    border-spacing: 10px;
 }
 
 #reports .container > div {
     display: table-cell;
-    padding: 0 0.5em;
+    border: 4px black outset;
+    background: #f0f0f0;
 }
 
 #reports .container h2 {
     margin-top: 0;
     width: 20em;
+}
+
+#reports .container h3 {
+    margin-top: 0;
 }
 
 #templates {
@@ -112,7 +114,6 @@ table, caption {
 }
 
 #reports th, td {
-    padding: 0.5em;
 }
 
 #errors {
@@ -256,6 +257,49 @@ div.indicatorlink {
 }
 
 div.report {
-    border-right: 1px black dotted;
-    padding: 10px;
+}
+
+.statsentry .name {
+    font-weight: bold;
+}
+
+div.bolttopleft {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 5px;
+    height: 5px;
+    background-image:url('images/bolt.png');
+}
+
+div.bolttopright {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 5px;
+    height: 5px;
+    background-image:url('images/bolt.png');
+}
+
+div.boltbottomleft {
+    position: absolute;
+    bottom: 2px;
+    left: 2px;
+    width: 5px;
+    height: 5px;
+    background-image:url('images/bolt.png');
+}
+
+div.boltbottomright {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 5px;
+    height: 5px;
+    background-image:url('images/bolt.png');
+}
+
+div.foooo {
+  position: relative;
+  padding: 10px;
 }
