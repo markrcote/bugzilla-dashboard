@@ -63,8 +63,7 @@ var Bugzilla = {
       newOptions[name] = options[name];
     options = newOptions;
 
-    function onLoad() {
-      var response = JSON.parse(xhr.responseText);
+    function onLoad(response) {
       if (!response.error)
         options.success(response);
       // TODO: We should really call some kind of error callback
@@ -75,19 +74,24 @@ var Bugzilla = {
       options.fail();
     }
 
-    var xhr = options.xhr ? options.xhr : new XMLHttpRequest();
     var url = this.BASE_URL + options.url;
 
     if (options.data)
       url = url + "?" + this.queryString(options.data);
-    xhr.open(options.method, url);
-    xhr.setRequestHeader("Accept", "application/json");
-    xhr.setRequestHeader("Content-Type", "application/json");
-    xhr.addEventListener("load", onLoad, false);
+    
+    var xhrData = {
+      method: options.method,
+      url: url,
+      headers: [
+        ["Accept", "application/json"],
+        ["Content-Type", "application/json"]
+      ],
+      onLoad: [onLoad],
+      onErr: []
+    };
     if (options.fail)
-      xhr.addEventListener("error", onErr, false);
-    xhr.send(null);
-    return xhr;
+      xhrData.onErr.push(onErr);
+    return xhrData;
   },
   getBug: function Bugzilla_getBug(id, cb) {
     return this.ajax({url: "/bug/" + id,

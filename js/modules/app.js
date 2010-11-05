@@ -143,13 +143,10 @@ Require.modules["app/errors"] = function(exports, require) {
 
 Require.modules["app/bugzilla-auth"] = function(exports, require) {
   function onError(event) {
-    var xhr = event.target;
     require("app/errors").log("bugzilla-api-error");
   }
 
-  function onLoad(event) {
-    var xhr = event.target;
-    var response = JSON.parse(xhr.responseText);
+  function onLoad(response) {
     if (response.error)
     {
       if (response.code == 300) {
@@ -172,12 +169,10 @@ Require.modules["app/bugzilla-auth"] = function(exports, require) {
           options.data.password = user.password;
         }
 
-        var xhr = Bugzilla.ajax.call(this, options);
-
-        xhr.addEventListener("load", onLoad, false);
-        xhr.addEventListener("error", onError, false);
-
-        return xhr;
+        var xhrData = Bugzilla.ajax.call(this, options);
+        xhrData.onLoad.push(onLoad);
+        xhrData.onErr.push(onError);
+        return xhrData;
       };
     }
 
@@ -451,6 +446,8 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
   var window = require("window");
   var xhrQueue = require("xhr/queue").create();
   var isAuthenticated = false;  // set by update()
+  
+  var startTime;
 
   function QueryRunner(forceUpdate, usernames, queryInitCb, queryDoneCb, allDoneCb) {
     // FIXME: Could probably split this into another object per query.
@@ -459,14 +456,16 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     this.queryDoneCb = queryDoneCb;
     this.allDoneCb = allDoneCb;
     this.queryCount = 0;
-    this.id = "";
     this.results = {};
     
     this.queryDone = function(usernames, query) {
+      /*****
       for (u in this.results[query.id]) {
         var cacheKey = this.cacheId(u, query);
         cache.set(cacheKey, this.results[query.id][u]);
       }
+      */
+      cache.set(this.cacheId(usernames, query), this.results[query.id]);
       this.queryDoneCb(usernames, query, this.results);
       this.decQueryCount();
     }
@@ -476,11 +475,13 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         this.allDoneCb(this.results);
     }
 
-    this.cacheId = function(username, query) {
-      return username + "_" + (isAuthenticated ? "PRIVATE" : "PUBLIC") + "/" + query.id;
+    this.cacheId = function(usernames, query) {
+      return usernames.join("") + "_" + (isAuthenticated ? "PRIVATE" : "PUBLIC") + "/" + query.id;
     }
     
     this.parseResults = function(query, response) {
+      this.results[query.id] = response.data;
+      /*
       if ("get_values" in query)
         query.get_values(this.results[query.id], response);
       else {
@@ -495,21 +496,22 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
             }
           }
         }
-      }
+      }*/
     }
     
     this.getStat = function(usernames, forceUpdate, query, getStatCb) {
+      this.results[query.id] = 0;
+      /**
       this.results[query.id] = {};
       for (u in usernames)
         this.results[query.id][usernames[u]] = 0;
-
+      
       var uncachedUsernames = [];
       for (u in usernames) {
         var cacheKey = this.cacheId(usernames[u], query);
         if (!forceUpdate && cache.haskey(cacheKey)) {
           this.results[query.id][usernames[u]] = cache.get(this.cacheId(usernames[u], query));
         }
-        else
           uncachedUsernames.push(usernames[u]);
       }
       
@@ -517,28 +519,45 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         this.queryDone(usernames, query);
         return;
       }
+      **/
+
+      if (!forceUpdate) {
+        var cacheKey = this.cacheId(usernames, query);
+        if (cache.haskey(cacheKey)) {
+          this.results[query.id] = cache.get(cacheKey);
+          this.queryDone(usernames, query);
+          return;
+        }
+      }
       
-      var args = query.args(uncachedUsernames);
-      if ("include_fields" in query)
-        args.include_fields = query.include_fields;
+      //var args = query.args(uncachedUsernames);
+      //if ("include_fields" in query)
+      //  args.include_fields = query.include_fields;
+      var args = query.args(usernames);
       var newTerms = translateTerms(args);
+      
+      var priority = require("queries").DEFAULT_PRIORITY;
+      if ("priority" in query)
+        priority = query.priority;
 
       var self = this;
       xhrQueue.enqueue(
         function() {
-          return bugzilla.search(
+          //return bugzilla.search(  XXXXXXXX
+          return bugzilla.count(
+          ///// XXXXX
             newTerms,
             function(response) {
               self.parseResults(query, response);
               self.queryDone(usernames, query);
             });
-        });
+        }, priority);
     }
     
     var queries = [];
     
-    for (q in require("queries")) {
-      var query = require("queries")[q](this.usernames);
+    for (q in require("queries").queries) {
+      var query = require("queries").queries[q](this.usernames);
       if (query.requires_user && !this.usernames)
         continue;
       queries.push(query);
@@ -546,10 +565,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     }
     var self = this;
     for (q in queries) {
-      if (!this.queryInitCb(this.usernames, queries[q])) {
-        this.decQueryCount();
-        continue;
-      }
+      this.queryInitCb(this.usernames, queries[q]);
       this.getStat(this.usernames, forceUpdate, queries[q],
           function(usernames, query, value) {
             self.queryDone(usernames, query, value);
@@ -570,13 +586,15 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       this.stats[query.id].find(".name").text(query.short_form);
       this.stats[query.id].find(".value").text("...");
       this.indicatorBox.append(this.stats[query.id]);
-      return true;
     }
     
     this.queryDoneCb = function(usernames, query, results) {
+      /***
       var total = 0;
-      for (u in results[query.id])
-        total += results[query.id][u];
+      for (u in this.userIds)
+        total += results[query.id][this.userIds[u]];
+        */
+      var total = results[query.id];
       this.stats[query.id].find(".value").text(total);
       if ("threshold" in query) {
         if (total > query.threshold[0] * this.userIds.length)
@@ -584,20 +602,19 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         else if (total > query.threshold[1] * this.userIds.length)
           this.warn = true;
       }
+      this.setColour();
     }
     
-    this.allDoneCb = function() {
-      this.indicatorBox.removeClass("indicatorLoading");
-      this.indicatorBox.removeClass("indicatorOk");
-      this.indicatorBox.removeClass("indicatorWarn");
-      this.indicatorBox.removeClass("indicatorErr");
-      
+    this.setColour = function() {
+      var newClass = "";
       if (this.err)
-        this.indicatorBox.addClass("indicatorErr");
+        newClass = "indicatorErr";
       else if (this.warn)
-        this.indicatorBox.addClass("indicatorWarn");
+        newClass = "indicatorWarn";
       else
-        this.indicatorBox.addClass("indicatorOk");
+        newClass = "indicatorOk";
+      if (!this.indicatorBox.hasClass(newClass))
+        this.indicatorBox.removeClass("indicatorLoading indicatorOk indicatorWarn indicatorErr").addClass(newClass);
     }
     
     this.go = function(forceUpdate) {
@@ -605,21 +622,14 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       this.queryRunner = new QueryRunner(forceUpdate, this.userIds,
           function(usernames, query) { return self.queryInitCb(usernames, query); },
           function(usernames, query, value) { self.queryDoneCb(usernames, query, value); },
-          function() { self.allDoneCb(); });
-      this.queryRunner.id = this.indicatorBox.attr("id");
+          function() { });
     }
   }
   
   function Report(id, name) {
     this.id = id;
     this.name = name;
-    this.query_count = 0;
     
-    this.query_done = function () {
-      if (--this.query_count == 0)
-        this.name_entry.removeClass("loading");
-    }
-
     this.setupReportDisplay = function (selector) {
       this.entry = $("#templates .report").clone();
       this.name_entry = this.entry.find(".name")
@@ -641,29 +651,32 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       entry.find(".name").text(query.name);
       entry.find(".value").text("...");
       this.stats.append(entry);
-      return true;
     }
     
     this.queryDoneCb = function (usernames, query, results) {
+      /***
       var total = 0;
       for (u in results[query.id])
         total += results[query.id][u];
+      */
+      var total = results[query.id];
       $("#" + this.cleanId(this.id + query.id)).find(".value").text(total);
     }
     
-    this.allDoneCb = function(cb) {
+    this.allDoneCb = function() {
+      var d = new Date();
+      console.log("report " + name + " finished: " + (d.getTime() - startTime));
       this.name_entry.removeClass("loading");
-      if (cb)
-        cb();
     }
     
-    this.displayQueries = function (selector, forceUpdate, cb) {
+    this.displayQueries = function (selector, forceUpdate) {
       this.selector = selector;
       var self = this;
-      this.QueryRunner = new QueryRunner(forceUpdate, this.usernames(),
+      this.QueryRunner = new QueryRunner(
+          forceUpdate, this.usernames(),
           function(usernames, query) { return self.queryInitCb(usernames, query); },
           function(usernames, query, value) { self.queryDoneCb(usernames, query, value); },
-          function() { self.allDoneCb(cb); });
+          function() { self.allDoneCb(); });
     }
   }
   
@@ -676,15 +689,10 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       return require("teams").getMembers(this.team).map(function(x) { return x[1]; });
     }
     
-    this._allDoneCb = function () {
-      for (i in this.indicatorLoaders)
-        this.indicatorLoaders[i].go(false);
-    }
-    
     this.update = function (selector, forceUpdate) {
       this.indicatorLoaders = [];
       this.setupReportDisplay(selector);
-      var self = this;
+      this.displayQueries(selector, forceUpdate);
       var indicatorPanel = this.entry.find(".indicator-panel");
       
       if ("teams" in this.team) {
@@ -711,7 +719,8 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         this.displayIndicators(indicatorPanel, indicators);
       }
 
-      this.displayQueries(selector, forceUpdate, function() { self._allDoneCb() });
+      for (i in this.indicatorLoaders)
+        this.indicatorLoaders[i].go(forceUpdate);
     }
 
     this.displayIndicators = function (indicatorPanel, indicatorList) {
@@ -793,6 +802,8 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
   }
 
   function update(who, _isAuthenticated, forceUpdate) {
+    var d = new Date();
+    startTime = d.getTime();
     xhrQueue.clear();
     isAuthenticated = _isAuthenticated;
     var container = $("#reports").find(".container");

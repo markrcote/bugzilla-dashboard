@@ -56,8 +56,11 @@ Require.modules["queries"] = function(exports, require) {
       }
     }
   }
+  
+  exports.DEFAULT_PRIORITY = 5;
 
-  exports.open_blockers = function() {
+  exports.queries = {
+    open_blockers: function() {
     return {
       id: 'open_blockers',
       name: 'Open blockers',
@@ -72,10 +75,9 @@ Require.modules["queries"] = function(exports, require) {
         return addUserAssignedQuery(a, 1, usernames);
       }
     };
-  };
-
+  },
   /*
-  exports.open_noms = function() {
+    open_noms: function() {
     return {
       id: 'open_noms',
       name: 'Blocker nominations',
@@ -91,11 +93,9 @@ Require.modules["queries"] = function(exports, require) {
         };
         return addUserAssignedQuery(a, 1, usernames);
       }
-    };
-  };
+    },
   */
-
-  exports.regressions = function() {
+  regressions: function() {
     return {
       id: 'regressions',
       name: 'Open regression blockers',
@@ -113,53 +113,9 @@ Require.modules["queries"] = function(exports, require) {
         return addUserAssignedQuery(a, 2, usernames);
       }
     };
-  };
+  },
 
-  exports.patches_awaiting_review = function() {
-    return {
-      id: 'patches_awaiting_review',
-      name: 'Patches awaiting review',
-      short_form: "P",
-      requires_user: true,
-      include_fields: "attachments",
-      args: function(usernames) {
-        // username is mandatory
-        var a = {
-          resolution: "---",
-          type0_HYPH_0_HYPH_0: "substring",
-          field0_HYPH_0_HYPH_0: "flagtypes.name",
-          value0_HYPH_0_HYPH_0: "review?"
-        };
-        return addUserQuery("setters.login_name", "substring", a, 1, usernames);
-      },
-      get_values: function(query_results, response) {
-        searchReviews("setter", query_results, response);
-      }
-    };
-  };
-
-  exports.review_queue = function() {
-    return {
-      id: 'review_queue',
-      name: 'Review queue',
-      short_form: "RQ",
-      requires_user: true,
-      threshold: [15, 8],
-      include_fields: "attachments",
-      args: function(usernames) {
-        var a = {
-          resolution: "---"
-        };
-        // REST API is flag.requestee
-        return addUserQuery("requestees.login_name", "equals", a, 0, usernames);
-      },
-      get_values: function(query_results, response) {
-        searchReviews("requestee", query_results, response);
-      }
-    };
-  };
-
-  exports.crashers = function() {
+  crashers: function() {
     return {
       id: 'crashers',
       name: 'Crasher blockers',
@@ -177,9 +133,9 @@ Require.modules["queries"] = function(exports, require) {
         return addUserAssignedQuery(a, 2, usernames);
       }
     };
-  };
+  },
 
-  exports.security = function() {
+  security: function() {
     return {
       id: 'security',
       name: 'Security blockers',
@@ -200,9 +156,9 @@ Require.modules["queries"] = function(exports, require) {
         return addUserAssignedQuery(a, 2, usernames);
       }
     };
-  };
+  },
 
-  exports.blockers_fixed_30_days = function() {
+  blockers_fixed_30_days: function() {
     return {
       id: 'blockers_fixed_30_days',
       name: 'Blockers fixed in the last 30 days',
@@ -221,9 +177,9 @@ Require.modules["queries"] = function(exports, require) {
         return addUserAssignedQuery(a, 1, usernames);
       }
     };
-  };
+  },
 
-  exports.nonblockers_fixed_30_days = function() {
+  nonblockers_fixed_30_days: function() {
     return {
       id: 'nonblockers_fixed_30_days',
       name: 'Nonblockers fixed in the last 30 days',
@@ -247,5 +203,52 @@ Require.modules["queries"] = function(exports, require) {
         return addUserAssignedQuery(a, 2, usernames);
       }
     };
+  },
+
+  patches_awaiting_review: function() {
+    return {
+      id: 'patches_awaiting_review',
+      name: 'Patches awaiting review',
+      short_form: "P",
+      requires_user: true,
+      include_fields: "attachments",
+      priority: 1,
+      args: function(usernames) {
+        // username is mandatory
+        var a = {
+          resolution: "---",
+          type0_HYPH_0_HYPH_0: "substring",
+          field0_HYPH_0_HYPH_0: "flagtypes.name",
+          value0_HYPH_0_HYPH_0: "review?"
+        };
+        return addUserQuery("setters.login_name", "substring", a, 1, usernames);
+      },
+      get_values: function(query_results, response) {
+        searchReviews("setter", query_results, response);
+      }
+    };
+  },
+
+  review_queue: function() {
+    return {
+      id: 'review_queue',
+      name: 'Review queue',
+      short_form: "RQ",
+      requires_user: true,
+      threshold: [15, 8],
+      include_fields: "attachments",
+      priority: 0,
+      args: function(usernames) {
+        var a = {
+          resolution: "---"
+        };
+        // REST API is flag.requestee
+        return addUserQuery("requestees.login_name", "equals", a, 0, usernames);
+      },
+      get_values: function(query_results, response) {
+        searchReviews("requestee", query_results, response);
+      }
+    };
+  }
   };
 };
