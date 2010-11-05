@@ -7,7 +7,6 @@ Require.modules["xhr/queue"] = function(exports, require) {
     this.onDone = onDone;
 
     this.onWorkerMessage = function(event) {
-      console.log("got message from worker");
       var responseType = event.data[0];
       var responseText = event.data[1];
         
@@ -77,8 +76,6 @@ Require.modules["xhr/queue"] = function(exports, require) {
         var cb = queue[pri].splice(0, 1)[0];
         if (queue[pri].length == 0)
           delete queue[pri];
-        
-        console.log("cb is of pri " + pri);
         
         var xhrData = cb();
         if (!xhrData)
