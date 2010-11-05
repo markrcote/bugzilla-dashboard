@@ -212,7 +212,7 @@ Require.modules["queries"] = function(exports, require) {
       short_form: "P",
       requires_user: true,
       include_fields: "attachments",
-      priority: 1,
+      //priority: 1,
       args: function(usernames) {
         // username is mandatory
         var a = {
@@ -237,7 +237,7 @@ Require.modules["queries"] = function(exports, require) {
       requires_user: true,
       threshold: [15, 8],
       include_fields: "attachments",
-      priority: 0,
+      //priority: 0,
       args: function(usernames) {
         var a = {
           resolution: "---"
