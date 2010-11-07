@@ -670,6 +670,8 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     
     this.allDoneCb = function() {
       this.name_entry.removeClass("loading");
+      //var d = new Date();
+      //console.log("Report " + this.name + " loaded in " + ((d.getTime() - startTime)/1000) + " s");
     }
     
     this.displayQueries = function (selector, forceUpdate) {
