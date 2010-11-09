@@ -762,7 +762,6 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         this.createToDo();
       this.name_entry.addClass("pagelink");
       var self = this;
-      console.log("group id: " + self.id + " hash: " + require("app/ui/hash").groupnameToHash(self.id));
       this.name_entry.click(function() { window.open(require("app/ui/hash").groupnameToHash(self.id)); });
       this.displayQueries(selector, forceUpdate);
       /*
