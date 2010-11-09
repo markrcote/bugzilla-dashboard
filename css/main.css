@@ -62,11 +62,6 @@ a:hover {
     border-spacing: 10px;
 }
 
-.reports .container {
-    display: table-row;
-    width: 100%;
-}
-
 .reports .container > div {
     display: table-cell;
     border: 4px black outset;

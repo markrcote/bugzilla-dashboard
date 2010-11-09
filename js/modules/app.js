@@ -660,11 +660,8 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     ];
     
     this.setupReportDisplay = function (selector) {
-      //this.entry = $("#templates .report").clone();
-      var foo = document.createElement("td");
-      this.entry = $(foo);
-      var reportbox = $("#templates .reportbox").clone();
-      this.entry.append(reportbox);
+      this.entry = $("#templates td.reportcell").clone();
+      var reportbox = this.entry.find(".reportbox");
       
       this.name_entry = this.entry.find(".name")
       this.name_entry.text(this.name);
@@ -868,8 +865,9 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
   }
   TeamReport.prototype = new Report;
 
-  function UserReport(user) {
-    Report.call(this, user[1], user[0]);
+  function UserReport(userPath, user, detailed) {
+    Report.call(this, user[1], user[0], detailed, false);
+    this.userPath = userPath;
     
     this.usernames = function () {
       return [this.id];
@@ -881,18 +879,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     
     this.update = function (selector, forceUpdate) {
       this.setupReportDisplay(selector);
-      var self = this;
-      xhrQueue.enqueue(
-        function() {
-          return bugzilla.user(
-            self.id,
-            function(response) {
-              self.displayQueries(selector, forceUpdate);
-            },
-            function(response) {
-              self.stats.text("No such user exists!");
-            });
-        });
+      this.displayQueries(selector, forceUpdate);
     }
   }
   UserReport.prototype = new Report;
@@ -907,51 +894,87 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
   var teamReports = [];
   var userReports = [];
   
-  function teamList(selector, forceUpdate, baseTeamId, teams) {
+  function teamList(selector, template, forceUpdate, baseTeamId, teams) {
     var topLevel = false;
     if (!teams) {
       teams = require("app/teams").get();
       topLevel = true;
     }
     teamReports = [];
+    var reportCount = 0;
+    var row = null;
     for (t in teams) {
+      if ((reportCount++ % REPORTS_PER_ROW) == 0) {
+        row = template.clone();
+        selector.append(row);
+      }
       var teamId = t;
       if (baseTeamId)
         teamId = baseTeamId + "/teams/" + t;
       var report = new TeamReport(teamId, teams[t], false, topLevel);
       teamReports.push(report);
-      report.update(selector, forceUpdate);
+      report.update(row, forceUpdate);
     }
   }
 
+  var REPORTS_PER_ROW = 6;
+  
+  function userList(selector, template, forceUpdate, baseTeamId, users) {
+    userReports = [];
+    var reportCount = 0;
+    var row = null;
+    for (u in users) {
+      if ((reportCount++ % REPORTS_PER_ROW) == 0) {
+        row = template.clone();
+        selector.append(row);
+      }
+      var userId = "";
+      if (baseTeamId)
+        userId = baseTeamId + "/members/" + users[u];
+      var report = new UserReport(userId, users[u], false);
+      userReports.push(report);
+      console.log("user report for " + users[u][0]);
+      report.update(row, forceUpdate);
+    }
+  }
+ 
   function update(who, _isAuthenticated, forceUpdate) {
     var d = new Date();
     startTime = d.getTime();
     xhrQueue.clear();
     isAuthenticated = _isAuthenticated;
-    var teamListContainer = $("#teamlist")
-    var detailedReportContainer = $("#detailedreport")
+    var detailedReportContainer = $("#templates tr.detailedreport").clone();
+    var teamListTemplate = $("#templates tr.teamlist");
+    var memberListTemplate = $("#templates tr.memberlist");
+    
+    $("#reports").html("");
+    
+    $("#reports").append(detailedReportContainer);
+    
     var title = require("queries").RELEASE_NAME + " Bugzilla Dashboard";
     if (document.title != title) {
       document.title = title;
       $("#header .title").text(title);
     }
 
-    teamListContainer.html("");
-    detailedReportContainer.html("");
-
     if (who.group) {
       teamReports = [];
       var team = require("teams").getByKey(who.group);
       var report = new TeamReport(who.group, team, true);
+      var teamCount = 0;
       teamReports.push(report);
       report.update(detailedReportContainer, forceUpdate);
       if ("teams" in team) {
-        teamList(teamListContainer, forceUpdate, who.group, team.teams);
-        var teamCount = 0;
+        teamList($("#reports"), teamListTemplate, forceUpdate, who.group, team.teams);
         for (t in team.teams)
           teamCount += 1;
         report.entry.attr("colspan", teamCount);
+      }
+      if ("members" in team) {
+        console.log("displaying members");
+        userList($("#reports"), memberListTemplate, forceUpdate, who.group, team.members);
+        if (team.members.length > teamCount)
+          report.entry.attr("colspan", team.members.length);
       }
     } else if (who.user) {
       userReports = [];
@@ -959,7 +982,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       userReports.push(report);
       report.update(container, forceUpdate);
     } else
-      teamList(teamListContainer, forceUpdate);
+      teamList($("#reports"), teamListTemplate, forceUpdate);
   };
 
   var refreshCommand = {

@@ -25,11 +25,7 @@
  </ul>
 </div>
 <div id="loading-screen" class="loading">&nbsp;</div>
-<table class="reports">
-    <tr id="detailedreport" class="container hide-while-loading">
-    </tr>
-    <tr id="teamlist" class="container hide-while-loading">
-    </tr>
+<table class="reports" id="reports">
 </table>
 <div id="quickstatserrors">
 </div>
@@ -73,14 +69,11 @@
 </div>
 <div id="errors"></div>
 <div id="templates">
-  <div class="reportentry"></div>
-  <div class="statsgroupentry">
-    <span class="indent"></span><span class="name"></span>:
-  </div>
-  <div class="statsentry">
-    <span class="indent"></span><span class="name"></span>:&nbsp;<span class="value"></span>
-  </div>
-    <div class="reportbox">
+  <table>
+    <tr class="detailedreport container hide-while-loading"></tr>
+    <tr class="teamlist container hide-while-loading"></tr>
+    <tr class="memberlist container hide-while-loading"></tr>
+    <tr><td class="reportcell"><div class="reportbox">
       <div class="bolttopleft"></div><div class="bolttopright"></div><div class="boltbottomleft"></div><div class="boltbottomright"></div>
       <h3 class="name">&nbsp;</h3>
       <div class="reportboxtable">
@@ -89,6 +82,15 @@
       </div>
       <div class="indicator-panel"></div>
     </div>
+    </td></tr>
+  </table>
+  <div class="reportentry"></div>
+  <div class="statsgroupentry">
+    <span class="indent"></span><span class="name"></span>:
+  </div>
+  <div class="statsentry">
+    <span class="indent"></span><span class="name"></span>:&nbsp;<span class="value"></span>
+  </div>
   <div class="reportdetails"></div>
   <div class="statsgroupsep"><hr/></div>
   <div class="indicator-row"></div>
