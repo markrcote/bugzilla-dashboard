@@ -285,6 +285,10 @@ div.indicatorlink {
     font-weight: bold;
 }
 
+.statsgroupentry .name {
+    font-weight: bold;
+}
+
 div.bolttopleft {
     position: absolute;
     top: 2px;

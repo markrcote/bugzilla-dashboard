@@ -632,15 +632,31 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     }
   }
   
-  function Report(id, name, detailed) {
+  function Report(id, name, detailed, topLevel) {
     this.id = id;
     this.name = name;
     this.detailed = detailed;
+    this.topLevel = topLevel;
+    
+    this.parentTeam = function () {
+      // In the form .../<superteam>/teams/<team>
+      var paths = this.id.split("/");
+      if (paths.length < 3 || paths.slice(-2, -1) != "teams")
+        return "";
+      return paths.slice(-3, -2);
+    };
     
     this.displayedQueries = [ 
-      ["open_blockers", "security", "regressions", "crashers"],
-      ["patches_awaiting_review", "review_queue"],
-      ["blockers_fixed_30_days", "nonblockers_fixed_30_days"],
+      { type: "group", name: "Blockers", members: [                       
+        {type: "stat", name: "All", query: "open_blockers"},
+        {type: "stat", name: "Security", query: "security"},
+        {type: "stat", name: "Regressions", query: "regressions"},
+        {type: "stat", name: "Crashers", query: "crashers"}] },
+      { type: "group", name: "Fixed in Last 30 Days", members: [ 
+        {type: "stat", name: "Blockers", query: "blockers_fixed_30_days"},
+        {type: "stat", name: "NonBlockers", query: "nonblockers_fixed_30_days"} ] },
+      { type: "stat", name: "Patches Awaiting Review", query: "patches_awaiting_review"},
+      { type: "stat", name: "Review Queue", query: "review_queue"}
     ];
     
     this.setupReportDisplay = function (selector) {
@@ -654,16 +670,18 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       this.name_entry.text(this.name);
       this.name_entry.addClass("loading");
       this.stats = this.entry.find(".stats");
-      var interimRelName = $("#templates .statsentry").clone();
-      interimRelName.find(".name").text("Next Interim Release");
-      interimRelName.find(".value").text(require("queries").NEXT_INTERIM_RELEASE);
-      var productRelName = $("#templates .statsentry").clone();
-      productRelName.find(".name").text("Next Product Release");
-      productRelName.find(".value").text(require("queries").NEXT_PRODUCT_RELEASE);
-      var sep = $("#templates .statsgroupsep").clone();
-      this.stats.append(interimRelName);
-      this.stats.append(productRelName);
-      this.stats.append(sep);
+      if (this.topLevel) {
+        var interimRelName = $("#templates .statsentry").clone();
+        interimRelName.find(".name").text("Next Interim Release");
+        interimRelName.find(".value").text(require("queries").NEXT_INTERIM_RELEASE);
+        var productRelName = $("#templates .statsentry").clone();
+        productRelName.find(".name").text("Next Product Release");
+        productRelName.find(".value").text(require("queries").NEXT_PRODUCT_RELEASE);
+        var sep = $("#templates .statsgroupsep").clone();
+        this.stats.append(interimRelName);
+        this.stats.append(productRelName);
+        this.stats.append(sep);
+      }
       selector.append(this.entry);
       if (this.detailed) {
         this.entry.attr("colspan", "0");
@@ -674,16 +692,6 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
 
     this.cleanId = function(id) {
       return id.replace(/@/g, "").replace(/\./g, "").replace(/_/g, "").replace(/\//g, "");
-    };
-    
-    this.queryInitCb = function (usernames, query) {
-      var entry = $("#templates .statsentry").clone();
-      entry.click(function() { window.open(bugzilla.uiQueryUrl(translateTerms(query.args(usernames)))); });
-      entry.attr("id", this.cleanId(this.id + query.id));
-      entry.addClass("pagelink");
-      entry.find(".name").text(query.name);
-      entry.find(".value").text("...");
-      this.stats.append(entry);
     };
     
     this.queryDoneCb = function (usernames, query, results) {
@@ -702,23 +710,66 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       //console.log("Report " + this.name + " loaded in " + ((d.getTime() - startTime)/1000) + " s");
     };
     
+    this.getIndent = function (indentLevel) {
+      var indent = "";
+      if (indentLevel) {
+        for (var i = 0; i < indentLevel; i++)
+          indent += "&nbsp;&nbsp;";
+      }
+      return indent;
+    };
+    
+    this.displayEntry = function(selector, queries, entry, indentLevel) {
+      switch (entry.type) {
+        case "group": this.displayGroup(selector, queries, entry, indentLevel); break;
+        case "stat": this.displayStat(selector, queries, entry, indentLevel); break;
+      }
+    };
+    
+    this.displayGroup = function (selector, queries, group, indentLevel) {
+      if (indentLevel === undefined)
+        indentLevel = 0;
+      var indent = this.getIndent(indentLevel);
+      var entry = $("#templates .statsgroupentry").clone();
+      entry.find(".indent").html(indent);
+      entry.find(".name").text(group.name);
+      selector.append(entry);
+      
+      for (m in group.members)
+        this.displayEntry(selector, queries, group.members[m], indentLevel+1);
+    };
+    
+    this.displayStat = function (selector, queries, stat, indentLevel) {
+      if (indentLevel === undefined)
+        indentLevel = 0;
+      var indent = this.getIndent(indentLevel);
+      var entry = $("#templates .statsentry").clone();
+      var query = require("queries").queries[stat.query]();
+      queries.push(query);
+      entry.find(".indent").html(indent);
+      entry.click(function() { window.open(bugzilla.uiQueryUrl(translateTerms(query.args(this.usernames)))); });
+      entry.attr("id", this.cleanId(this.id + query.id));
+      entry.addClass("pagelink");
+      entry.find(".name").text(stat.name);
+      entry.find(".value").text("...");
+      selector.append(entry);
+    };
+    
     this.displayQueries = function (selector, forceUpdate) {
       this.selector = selector;
       var self = this;
       var queries = [];
-      var displayedFirstGroup = false; 
+      var previousWasGroup = false; 
+      
       for (i in this.displayedQueries) {
-        if (displayedFirstGroup) {
+        if (previousWasGroup) {
           var sep = $("#templates .statsgroupsep").clone();
           this.stats.append(sep);
-        } else
-          displayedFirstGroup = true;
-        for (j in this.displayedQueries[i]) {
-          var query = require("queries").queries[this.displayedQueries[i][j]]();
-          queries.push(query);
-          this.queryInitCb(this.usernames(), query);
         }
+        this.displayEntry(this.stats, queries, this.displayedQueries[i], 0, previousWasGroup);
+        previousWasGroup = (this.displayedQueries[i].type == "group"); 
       }
+      
       this.QueryRunner = new QueryRunner(
           forceUpdate, this.usernames(),
           function(usernames, query) { },
@@ -733,19 +784,11 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     $("#todo").fadeIn();    
   }
   
-  function TeamReport(teamId, team, detailed) {
-    Report.call(this, teamId, team.name);
+  function TeamReport(teamId, team, detailed, topLevel) {
+    Report.call(this, teamId, team.name, detailed, topLevel);
     this.team = team;
     this.indicatorLoaders = [];
     this.detailed = detailed;
-    
-    this.parentTeam = function () {
-      // In the form .../<superteam>/teams/<team>
-      var paths = this.id.split("/");
-      if (paths.length < 3 || paths.slice(-2, -1) != "teams")
-        return "";
-      return paths.slice(-3, -2);
-    };
     
     this.usernames = function () {
       return require("teams").getMembers(this.team).map(function(x) { return x[1]; });
@@ -865,14 +908,17 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
   var userReports = [];
   
   function teamList(selector, forceUpdate, baseTeamId, teams) {
-    if (!teams)
+    var topLevel = false;
+    if (!teams) {
       teams = require("app/teams").get();
+      topLevel = true;
+    }
     teamReports = [];
     for (t in teams) {
       var teamId = t;
       if (baseTeamId)
         teamId = baseTeamId + "/teams/" + t;
-      var report = new TeamReport(teamId, teams[t], false);
+      var report = new TeamReport(teamId, teams[t], false, topLevel);
       teamReports.push(report);
       report.update(selector, forceUpdate);
     }
