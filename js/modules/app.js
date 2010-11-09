@@ -933,7 +933,6 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         userId = baseTeamId + "/members/" + users[u];
       var report = new UserReport(userId, users[u], false);
       userReports.push(report);
-      console.log("user report for " + users[u][0]);
       report.update(row, forceUpdate);
     }
   }
@@ -971,7 +970,6 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         report.entry.attr("colspan", teamCount);
       }
       if ("members" in team) {
-        console.log("displaying members");
         userList($("#reports"), memberListTemplate, forceUpdate, who.group, team.members);
         if (team.members.length > teamCount)
           report.entry.attr("colspan", team.members.length);
