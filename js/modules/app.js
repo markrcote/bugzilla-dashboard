@@ -449,7 +449,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
   
   var startTime;
 
-  function QueryRunner(forceUpdate, usernames, queryInitCb, queryDoneCb, allDoneCb) {
+  function QueryRunner(forceUpdate, usernames, queryInitCb, queryDoneCb, allDoneCb, queries) {
     // FIXME: Could probably split this into another object per query.
     this.usernames = usernames.slice(0);
     this.queryInitCb = queryInitCb;
@@ -559,15 +559,16 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         }, priority);
     }
     
-    var queries = [];
-    
-    for (q in require("queries").queries) {
-      var query = require("queries").queries[q](this.usernames);
-      if (query.requires_user && !this.usernames)
-        continue;
-      queries.push(query);
-      ++this.queryCount;
+    if (!queries) {
+      queries = [];
+      for (q in require("queries").queries) {
+        var query = require("queries").queries[q]();
+        if (query.requires_user && !this.usernames)
+          continue;
+        queries.push(query);
+      }
     }
+    this.queryCount = queries.length;
     var self = this;
     for (q in queries) {
       this.queryInitCb(this.usernames, queries[q]);
@@ -631,22 +632,49 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     }
   }
   
-  function Report(id, name) {
+  function Report(id, name, detailed) {
     this.id = id;
     this.name = name;
+    this.detailed = detailed;
+    
+    this.displayedQueries = [ 
+      ["open_blockers", "security", "regressions", "crashers"],
+      ["patches_awaiting_review", "review_queue"],
+      ["blockers_fixed_30_days", "nonblockers_fixed_30_days"],
+    ];
     
     this.setupReportDisplay = function (selector) {
-      this.entry = $("#templates .report").clone();
+      //this.entry = $("#templates .report").clone();
+      var foo = document.createElement("td");
+      this.entry = $(foo);
+      var reportbox = $("#templates .reportbox").clone();
+      this.entry.append(reportbox);
+      
       this.name_entry = this.entry.find(".name")
       this.name_entry.text(this.name);
       this.name_entry.addClass("loading");
       this.stats = this.entry.find(".stats");
+      var interimRelName = $("#templates .statsentry").clone();
+      interimRelName.find(".name").text("Next Interim Release");
+      interimRelName.find(".value").text(require("queries").NEXT_INTERIM_RELEASE);
+      var productRelName = $("#templates .statsentry").clone();
+      productRelName.find(".name").text("Next Product Release");
+      productRelName.find(".value").text(require("queries").NEXT_PRODUCT_RELEASE);
+      var sep = $("#templates .statsgroupsep").clone();
+      this.stats.append(interimRelName);
+      this.stats.append(productRelName);
+      this.stats.append(sep);
       selector.append(this.entry);
-    }
+      if (this.detailed) {
+        this.entry.attr("colspan", "0");
+        this.details = $("#templates .reportdetails").clone();
+        reportbox.find(".reportboxtable").append(this.details);
+      }
+    };
 
     this.cleanId = function(id) {
       return id.replace(/@/g, "").replace(/\./g, "").replace(/_/g, "").replace(/\//g, "");
-    }
+    };
     
     this.queryInitCb = function (usernames, query) {
       var entry = $("#templates .statsentry").clone();
@@ -656,7 +684,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       entry.find(".name").text(query.name);
       entry.find(".value").text("...");
       this.stats.append(entry);
-    }
+    };
     
     this.queryDoneCb = function (usernames, query, results) {
       /***
@@ -666,40 +694,76 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       */
       var total = results[query.id];
       $("#" + this.cleanId(this.id + query.id)).find(".value").text(total);
-    }
+    };
     
     this.allDoneCb = function() {
       this.name_entry.removeClass("loading");
       //var d = new Date();
       //console.log("Report " + this.name + " loaded in " + ((d.getTime() - startTime)/1000) + " s");
-    }
+    };
     
     this.displayQueries = function (selector, forceUpdate) {
       this.selector = selector;
       var self = this;
+      var queries = [];
+      var displayedFirstGroup = false; 
+      for (i in this.displayedQueries) {
+        if (displayedFirstGroup) {
+          var sep = $("#templates .statsgroupsep").clone();
+          this.stats.append(sep);
+        } else
+          displayedFirstGroup = true;
+        for (j in this.displayedQueries[i]) {
+          var query = require("queries").queries[this.displayedQueries[i][j]]();
+          queries.push(query);
+          this.queryInitCb(this.usernames(), query);
+        }
+      }
       this.QueryRunner = new QueryRunner(
           forceUpdate, this.usernames(),
-          function(usernames, query) { return self.queryInitCb(usernames, query); },
+          function(usernames, query) { },
           function(usernames, query, value) { self.queryDoneCb(usernames, query, value); },
-          function() { self.allDoneCb(); });
-    }
+          function() { self.allDoneCb(); }, queries);
+    };
   }
   
-  function TeamReport(teamId, team) {
+  function ToDoList(teamId) {
+    this.teamId = teamId;
+    
+    $("#todo").fadeIn();    
+  }
+  
+  function TeamReport(teamId, team, detailed) {
     Report.call(this, teamId, team.name);
     this.team = team;
     this.indicatorLoaders = [];
+    this.detailed = detailed;
+    
+    this.parentTeam = function () {
+      // In the form .../<superteam>/teams/<team>
+      var paths = this.id.split("/");
+      if (paths.length < 3 || paths.slice(-2, -1) != "teams")
+        return "";
+      return paths.slice(-3, -2);
+    };
     
     this.usernames = function () {
       return require("teams").getMembers(this.team).map(function(x) { return x[1]; });
-    }
+    };
+    
+    this.createToDo = function () {
+      this.toDoList = new ToDoList(this.teamid);
+    };
     
     this.update = function (selector, forceUpdate) {
       this.indicatorLoaders = [];
       this.setupReportDisplay(selector);
+      if (this.singleTeamView)
+        this.createToDo();
       this.name_entry.addClass("pagelink");
       var self = this;
-      this.name_entry.click(function() { window.open(require("app/ui/hash").groupnameToHash(self.id)) });
+      console.log("group id: " + self.id + " hash: " + require("app/ui/hash").groupnameToHash(self.id));
+      this.name_entry.click(function() { window.open(require("app/ui/hash").groupnameToHash(self.id)); });
       this.displayQueries(selector, forceUpdate);
       /*
       var indicatorPanel = this.entry.find(".indicator-panel");
@@ -731,7 +795,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       for (i in this.indicatorLoaders)
         this.indicatorLoaders[i].go(forceUpdate);
       */
-    }
+    };
 
     this.displayIndicators = function (indicatorPanel, indicatorList) {
       var count = 0;
@@ -758,7 +822,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         }
         indicatorRow.append(indicatorBox);
       }
-    }
+    };
   }
   TeamReport.prototype = new Report;
 
@@ -801,11 +865,15 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
   var teamReports = [];
   var userReports = [];
   
-  function teamList(selector, forceUpdate) {
-    var teams = require("app/teams").get();
+  function teamList(selector, forceUpdate, baseTeamId, teams) {
+    if (!teams)
+      teams = require("app/teams").get();
     teamReports = [];
     for (t in teams) {
-      var report = new TeamReport(t, teams[t]);
+      var teamId = t;
+      if (baseTeamId)
+        teamId = baseTeamId + "/teams/" + t;
+      var report = new TeamReport(teamId, teams[t], false);
       teamReports.push(report);
       report.update(selector, forceUpdate);
     }
@@ -816,27 +884,37 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     startTime = d.getTime();
     xhrQueue.clear();
     isAuthenticated = _isAuthenticated;
-    var container = $("#reports").find(".container");
+    var teamListContainer = $("#teamlist")
+    var detailedReportContainer = $("#detailedreport")
     var title = require("queries").RELEASE_NAME + " Bugzilla Dashboard";
     if (document.title != title) {
       document.title = title;
       $("#header .title").text(title);
     }
 
-    container.html("");
+    teamListContainer.html("");
+    detailedReportContainer.html("");
 
     if (who.group) {
       teamReports = [];
-      var report = new TeamReport(who.group, require("teams").getByKey(who.group));
+      var team = require("teams").getByKey(who.group);
+      var report = new TeamReport(who.group, team, true);
       teamReports.push(report);
-      report.update(container, forceUpdate);
+      report.update(detailedReportContainer, forceUpdate);
+      if ("teams" in team) {
+        teamList(teamListContainer, forceUpdate, who.group, team.teams);
+        var teamCount = 0;
+        for (t in team.teams)
+          teamCount += 1;
+        report.entry.attr("colspan", teamCount);
+      }
     } else if (who.user) {
       userReports = [];
       var report = new UserReport(require("teams").getByKey(who.user));
       userReports.push(report);
       report.update(container, forceUpdate);
     } else
-      teamList(container, forceUpdate);
+      teamList(teamListContainer, forceUpdate);
   };
 
   var refreshCommand = {

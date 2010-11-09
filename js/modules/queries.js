@@ -59,8 +59,10 @@ Require.modules["queries"] = function(exports, require) {
   
   exports.DEFAULT_PRIORITY = 5;
   
-  exports.RELEASE_NAME = "Firefox 4 beta 7";
-  var blockingVer = "20";
+  exports.RELEASE_NAME = "Firefox 4";
+  exports.NEXT_INTERIM_RELEASE = "Beta7";
+  exports.NEXT_PRODUCT_RELEASE = "2.0";
+  var productRel = "20";
 
   exports.queries = {
     open_blockers: function() {
@@ -90,7 +92,7 @@ Require.modules["queries"] = function(exports, require) {
       args: function(usernames) {
         var a = {
           resolution: '---',
-          field0_HYPH_0_HYPH_0: 'cf_blocking_' + blockingVer',
+          field0_HYPH_0_HYPH_0: 'cf_blocking_' + productRel',
           type0_HYPH_0_HYPH_0: 'equals',
           value0_HYPH_0_HYPH_0: '?',
         };
@@ -130,7 +132,7 @@ Require.modules["queries"] = function(exports, require) {
           resolution: '---',
           field0_HYPH_0_HYPH_0: 'keywords',
           type0_HYPH_0_HYPH_0: 'anywords',
-          value0_HYPH_0_HYPH_0: 'crash topcrash',
+          value0_HYPH_0_HYPH_0: 'crash topcrash'
         };
         a = addBlockerQuery(a, 1);
         return addUserAssignedQuery(a, 2, usernames);
@@ -196,10 +198,10 @@ Require.modules["queries"] = function(exports, require) {
           changed_field_to: 'FIXED',
           changed_before: 'Now',
           changed_after: require("date-utils").timeAgo(MS_PER_DAY * 30),
-          field0_HYPH_0_HYPH_0: 'cf_blocking_' + blockingVer,
+          field0_HYPH_0_HYPH_0: 'cf_blocking_' + productRel,
           type0_HYPH_0_HYPH_0: 'notsubstring',
           value0_HYPH_0_HYPH_0: 'final',
-          field0_HYPH_1_HYPH_0: 'cf_blocking_' + blockingVer,
+          field0_HYPH_1_HYPH_0: 'cf_blocking_' + productRel,
           type0_HYPH_1_HYPH_0: 'notsubstring',
           value0_HYPH_1_HYPH_0: 'beta'
         };

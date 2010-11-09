@@ -52,27 +52,49 @@ a:hover {
     margin: 10em auto;
 }
 
-#reports {
-    padding-top: 1em;
+.reportrow {
+    display: table-row;
 }
 
-#reports .container {
+.reports {
+    padding-top: 1em;
     display: table;
     border-spacing: 10px;
 }
 
-#reports .container > div {
+.reports .container {
+    display: table-row;
+    width: 100%;
+}
+
+.reports .container > div {
     display: table-cell;
     border: 4px black outset;
     background: #f0f0f0;
 }
 
-#reports .container h2 {
+.reportboxtable {
+    display: table;
+    border-spacing: 0;
+}
+
+.reportdetails {
+    display: table-cell;
+}
+
+.reports td {
+    display: table-cell;
+    border: 4px black outset;
+    background: #f0f0f0;
+
+}
+
+.reports .container h2 {
     margin-top: 0;
     width: 20em;
 }
 
-#reports .container h3 {
+.reports .container h3 {
     margin-top: 0;
 }
 
@@ -93,27 +115,27 @@ table, caption {
     font-variant: inherit;
 }
 
-#reports table {
+.reports table {
     width: 100%;
     border-collapse: collapse;
 }
 
-#reports tr {
+.reports tr {
 }
 
-#reports th {
+.reports th {
     text-align: left;
 }
 
-#reports tr.bug-row {
+.reports tr.bug-row {
     cursor: pointer;
 }
 
-#reports tr.bug-row:hover {
+.reports tr.bug-row:hover {
     background: #f0f0f0;
 }
 
-#reports th, td {
+.reports th, td {
 }
 
 #errors {
@@ -256,7 +278,7 @@ div.indicatorErr {
 div.indicatorlink {
 }
 
-div.report {
+.report {
 }
 
 .statsentry .name {
@@ -302,4 +324,17 @@ div.boltbottomright {
 div.reportbox {
   position: relative;
   padding: 10px;
+}
+
+#todobox {
+    display: table-cell;
+}
+
+#todo {
+  display: none;
+  padding-left: 30px;
+}
+
+.statsgroupsep > hr {
+    border: 1px inset black;
 }
