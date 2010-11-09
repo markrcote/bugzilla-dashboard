@@ -739,12 +739,13 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     this.displayStat = function (selector, queries, stat, indentLevel) {
       if (indentLevel === undefined)
         indentLevel = 0;
+      var self = this;
       var indent = this.getIndent(indentLevel);
       var entry = $("#templates .statsentry").clone();
       var query = require("queries").queries[stat.query]();
       queries.push(query);
       entry.find(".indent").html(indent);
-      entry.click(function() { window.open(bugzilla.uiQueryUrl(translateTerms(query.args(this.usernames)))); });
+      entry.click(function() { window.open(bugzilla.uiQueryUrl(translateTerms(query.args(self.usernames())))); });
       entry.attr("id", this.cleanId(this.id + query.id));
       entry.addClass("pagelink");
       entry.find(".name").text(stat.name);
