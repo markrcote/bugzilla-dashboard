@@ -16,7 +16,7 @@ Require.modules["app/loader"] = function(exports, require) {
     else 
       cache = require("cache/html5").create(
         "bugzilla-dashboard-cache",
-        options.window.sessionStorage
+        options.window.localStorage
       );
 
     var bugzilla = require("app/bugzilla-auth").create(options.Bugzilla);
@@ -229,26 +229,6 @@ Require.modules["app/ui/login-form"] = function(exports, require) {
   };
 };
 
-Require.modules["app/ui/repair"] = function(exports, require) {
-  var $ = require("jQuery");
-
-  $("#repair form").submit(
-    function() {
-      var phrase = $("#repair .phrase").val();
-      var response;
-      if (phrase == "repair my dashboard") {
-        require("cache").clear();
-        response = $("#templates .repair-success").clone();
-      } else
-        response = $("#templates .repair-failure").clone();
-      $("#repair .result").empty().append(response);
-      $("#repair .result").hide().slideDown();
-    });
-
-  exports.init = function init() {
-  };
-};
-
 Require.modules["app/ui/find-user"] = function(exports, require) {
   var $ = require("jQuery");
   var bugzilla = require("bugzilla");
@@ -366,7 +346,6 @@ Require.modules["app/ui"] = function(exports, require) {
   };
 
   exports.init = function init(document) {
-    require("app/ui/repair").init();
     require("app/ui/dashboard").init();
     require("app/ui/login-form").init();
     require("app/ui/find-user").init();

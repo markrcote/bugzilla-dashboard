@@ -30,7 +30,7 @@ Require.modules["bool-chart"] = function(exports) {
 }
 
 var Bugzilla = {
-  BASE_URL: "https://api-dev.bugzilla.mozilla.org/latest",
+  BASE_URL: "/bugcache",
   BASE_UI_URL: "https://bugzilla.mozilla.org",
   DEFAULT_OPTIONS: {
     method: "GET"

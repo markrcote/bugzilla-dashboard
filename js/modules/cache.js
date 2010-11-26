@@ -22,7 +22,8 @@ Require.modules["cache/html5"] = function(exports, require) {
       },
 
       get: function get(key) {
-        return cache[key];
+        return undefined;
+        //return cache[key];
       },
 
       clear: function clear() {
@@ -31,7 +32,8 @@ Require.modules["cache/html5"] = function(exports, require) {
       },
       
       haskey: function haskey(key) {
-        return key in cache;
+        return false;
+        //return key in cache;
       }
     };
   };
