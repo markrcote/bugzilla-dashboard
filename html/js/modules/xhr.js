@@ -16,22 +16,30 @@ Require.modules["xhr/queue"] = function(exports, require) {
       } else if (responseType == "error") {
         for (i in this.xhrData.onErr)
           this.xhrData.onErr[i](responseText);
+      } else if (responseType == "log") {
+        console.log(responseText);
+        return;
       }
       this.active = false;
       this.xhrData = null;
       this.onDone();
     };
     
-    this.newJob = function(xhrData) {
+    this.newJob = function(tag, xhrData) {
       this.active = true;
       this.xhrData = xhrData;
       var self = this;
       this.worker.onmessage = function(event) { self.onWorkerMessage(event) };
-      this.worker.postMessage({
-        method: this.xhrData.method,
-        url: this.xhrData.url,
-        headers: this.xhrData.headers
-      });
+      var msg = {
+          jobId: tag.jobId,
+          method: this.xhrData.method,
+          url: this.xhrData.url,
+          headers: this.xhrData.headers,
+          body: this.xhrData.body
+        };
+      //console.log('posting message:');
+      //console.dir(msg);
+      this.worker.postMessage(msg);
     };
     
     this.terminate = function() {
@@ -39,68 +47,75 @@ Require.modules["xhr/queue"] = function(exports, require) {
       this.worker = new Worker("js/worker.js");
       this.active = false;
     }
+    
+    this.abort = function(jobId) {
+      this.worker.postMessage({ abort: jobId });
+    }
   }
   
   function XMLHttpRequestQueue() {
     const EVENTS = ["abort", "error", "load"];
     const NUM_WORKERS = 10;
+    var nextJobId = 0;
 
-    var queue = {};
+    var queue = [];
     
     function onDone() {
-      var freeWorker = getFreeWorker();
-      if (freeWorker)
-        activateNextInQueue(freeWorker);
+      activateNextInQueue();
     };
 
     var workers = [];
     for (var i = 0; i < NUM_WORKERS; i++)
       workers.push(new XHRWorker(onDone));
     
-    function getFreeWorker() {
-      for (w in workers) {
-        if (!workers[w].active)
-          return workers[w];
+    function activateNextInQueue() {
+      var workerId = -1;
+      for (var i = 0; i < workers.length; i++) {
+        if (!workers[i].active) {
+          workerId = i;
+          break;
+        }
       }
-      return null;
-    }
-    
-    function activateNextInQueue(worker) {
-      keys = [];
-      for (pri in queue)
-        keys.push(pri);
-      keys.sort();
-      
-      if (keys.length) {
-        var pri = keys[0];
-        var cb = queue[pri].splice(0, 1)[0];
-        if (queue[pri].length == 0)
-          delete queue[pri];
+      if (workerId == -1)
+        return;
+
+      var worker = workers[workerId];
+
+      var job = queue.splice(0, 1)[0];
+      if (!job)
+        return;
+      job.tag.workerId = workerId;
         
-        var xhrData = cb();
-        if (!xhrData)
-          throw new Error("enqueued callback did not return xhr");
+      var xhrData = job.cb();
+      if (!xhrData)
+        throw new Error("enqueued callback did not return xhr");
 
-        worker.newJob(xhrData);
-      }
+      worker.newJob(job.tag, xhrData);
     }
 
-    this.enqueue = function enqueue(cb, pri) {
-      if (!(pri in queue))
-        queue[pri] = [cb];
-      else
-        queue[pri].push(cb);
-      var freeWorker = getFreeWorker();
-      if (freeWorker)
-        activateNextInQueue(freeWorker);
+    this.enqueue = function enqueue(cb) {
+      var tag = {workerId: -1, jobId: nextJobId++};
+      queue.push({tag: tag, cb: cb});
+      activateNextInQueue();
+      return tag;
     };
 
     this.clear = function clear() {
-      for (pri in queue)
-        delete queue[pri];
+      queue = [];
       for (w in workers) {
         if (workers[w].active)
           workers[w].terminate();
+      }
+    };
+    
+    this.abort = function abort(tag) {
+      if (tag.workerId == -1) {
+        for (var i = 0; i < queue.length; i++) {
+          if (queue[i].tag.jobId == tag.jobId)
+            queue.splice(i, 1);
+        }
+      } else {
+        workers[tag.workerId].abort(tag.jobId);
       }
     };
   }

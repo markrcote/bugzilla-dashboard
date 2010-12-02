@@ -192,6 +192,12 @@ table, caption {
 }
 
 .dialog input[type=submit] {
+    cursor: pointer;
+    width: auto;
+}
+
+.dialog input[type=button] {
+    cursor: pointer;
     width: auto;
 }
 
@@ -207,10 +213,6 @@ table, caption {
     background-image: url('images/ajax-loader.gif');
     background-repeat: no-repeat;
     background-position: 95% 35%;
-}
-
-.dialog input[type=submit] {
-    cursor: pointer;
 }
 
 .dialog table {
@@ -336,4 +338,81 @@ div.reportbox {
 
 .statsgroupsep > hr {
     border: 1px inset black;
+}
+
+#admindivisionlist {
+}
+
+#adminteamlist {
+}
+
+div.listentry {
+    display: table-row;
+}
+
+div.listentrybutton {
+    display: table-cell;
+    text-align: right;
+}
+
+div.nodisplay {
+    visibility: hidden;
+}
+
+div.listentrytext {
+    display: table-cell;
+}
+
+div.listentrynone {
+    display: table-row;
+    font-style: italic;
+}
+
+div.listentry:hover {
+    cursor: pointer;
+    background: #ffffff;
+    color: #000000;
+}
+
+div.admincol {
+	float: left;
+}
+
+div.adminlist {
+    display: table;
+}
+
+div.adminpanel {
+    background: #f0f0f0;
+    border: 4px outset black;
+    position: relative;
+    margin: 20px;
+    padding: 10px;
+}
+
+.adminpanel h2 {
+    margin-top: 0;
+    width: 20em;
+}
+
+div.entitylist {
+	display: table;
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.entitylist tr {
+}
+
+.entitylist th {
+    text-align: left;
+}
+
+.entityselected {
+	background: #000000;
+	color: #ffffff;
+}
+
+button.adminbutton {
+	font-size: 6pt;
 }

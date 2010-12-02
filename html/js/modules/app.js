@@ -26,7 +26,7 @@ Require.modules["app/loader"] = function(exports, require) {
     moduleExports.window = options.window;
     moduleExports.jQuery = options.jQuery;
 
-    require("app/ui").init(options.window.document);
+    require("app/ui").init(options.window.document, options.admin);
     require("app/login").init();
   };
 };
@@ -233,9 +233,10 @@ Require.modules["app/ui/find-user"] = function(exports, require) {
   var $ = require("jQuery");
   var bugzilla = require("bugzilla");
   var window = require("window");
+  var xhrQueue = require("xhr/queue").create();
   var currReq;
 
-  var options = {
+  exports.options = {
     minLength: 2,
     delay: 100,
     source: function(request, response) {
@@ -251,15 +252,23 @@ Require.modules["app/ui/find-user"] = function(exports, require) {
           });
         response(suggs);
       }
-      if (currReq)
-        currReq.abort();
-      currReq = bugzilla.ajax({url: "/user",
+      if (currReq) {
+        console.log('aborting job');
+        console.dir(currReq);
+        xhrQueue.abort(currReq);
+      }
+      if (!request.term)
+        response([]);
+      var request = bugzilla.ajax({url: "/user",
                                data: {match: request.term},
                                success: success});
+      currReq = xhrQueue.enqueue(function() { return request; });
+      console.log('starting job');
+      console.dir(currReq);
     }
   };
 
-  $("#find-user .query").autocomplete(options);
+  $("#find-user .query").autocomplete(exports.options);
     
   $("#find-user form").submit(
     function(event) {
@@ -317,6 +326,15 @@ Require.modules["app/ui"] = function(exports, require) {
         openDialog(this.getAttribute("data-dialog"));
     });
 
+  $("button.adminadd").click(
+      function onMenuItemClick(event) {
+        if (this.hasAttribute("data-command")) {
+          var cmdName = this.getAttribute("data-command");
+          require("app/commands").get(cmdName).execute();
+        } else
+          openDialog(this.getAttribute("data-dialog"));
+      });
+
   // FIXME: Set up clickable (drill-down) commands
 
   $(".dialog").click(
@@ -345,8 +363,11 @@ Require.modules["app/ui"] = function(exports, require) {
       });
   };
 
-  exports.init = function init(document) {
-    require("app/ui/dashboard").init();
+  exports.init = function init(document, admin) {
+    if (admin === true)
+      require("app/ui/admin").init();
+    else
+      require("app/ui/dashboard").init();
     require("app/ui/login-form").init();
     require("app/ui/find-user").init();
     require("app/ui/hash").init(document);
@@ -417,6 +438,317 @@ Require.modules["app/ui/hash"] = function(exports, require) {
   };
 };
 
+Require.modules["app/ui/admin"] = function(exports, require) {
+  var server_url = "/bzdash";
+  var $ = require("jQuery");
+  var dateUtils = require("date-utils");
+  var bugzilla = require("bugzilla");
+  var window = require("window");
+  var xhrQueue = require("xhr/queue").create();
+  var isAuthenticated = false;  // set by update()
+  var products = {};
+
+  var currentDivisionId = -1;
+  var currentTeamId = -1;
+
+  function query_server(method, search, onLoad, body) {
+    var xhrData = {
+        method: method,
+        url: server_url + search,
+        headers: [
+          ["Accept", "application/json"],
+          ["Content-Type", "application/json"]
+        ],
+        onLoad: [onLoad],
+        onErr: [],
+        body: body
+      };
+    
+    xhrQueue.enqueue(
+      function() {
+        return xhrData;
+      }
+    );
+  }
+
+  function selectionChangedFunc(divId, teamId) {
+    if (teamId === undefined)
+      teamId = -1;
+    return function() { selectionChanged(divId, teamId); };
+  }
+
+  function delEntryDialogFunc(entry, entryType, id) {
+    return function() {
+      var dialog = $("#del-entry");
+      $(dialog.find("#del-entry-type")).text(entryType);
+      $(dialog.find("#del-entry-name")).text($(entry.find(".listentrytext")).text());
+      $("#del-entry form").submit(delEntryFunc(dialog, entry, entryType, id));
+      dialog.fadeIn(
+        function() {
+          dialog.find("input:first").focus();
+        });
+      
+    }
+  }
+
+  function delEntryFunc(dialog, entry, entryType, id) {
+    return function(event) {
+      event.preventDefault();
+      query_server("DEL", "/" + entryType + "/" + id);
+      entry.remove();
+      dialog.fadeOut();
+    };
+  }
+
+  
+  function newListEntry(parent, entryType, id, text, onclick) {
+    var entry = $("#templates .listentry").clone();
+    var entrytext = $(entry.find(".listentrytext"));
+    var entrybutton = $(entry.find(".listentrybutton"));
+    if (id)
+      entry.attr("id", entryType + id);
+    if (text)
+      entrytext.text(text);
+    if (onclick)
+      entrytext.click(onclick);
+    entry.hover(function() { $($(this).find(".listentrybutton")).removeClass("nodisplay"); },
+                function() { $($(this).find(".listentrybutton")).addClass("nodisplay"); });
+    entrybutton.click(delEntryDialogFunc(entry, entryType, id));
+    parent.append(entry);
+  }
+  
+  function divisionListLoaded(response) {
+    $("#admindivisionlist").find(".entitylist").html("");
+    
+    for (var i = 0; i < response.divisions.length; i++) {
+      newListEntry($("#admindivisionlist").find(".entitylist"),
+                   "division",
+                   response.divisions[i].id,
+                   response.divisions[i].name,
+                   selectionChangedFunc(response.divisions[i].id));
+    }
+
+    // load first division, if it exists
+    if (response.divisions.length > 0) {
+      selectionChanged(response.divisions[0].id, -1);
+    }
+  }
+
+  function divisionLoaded(response) {
+    for (var i = 0; i < response.divisions[0].teams.length; i++) {
+      newListEntry($("#adminteamlist").find(".entitylist"),
+                   "team",
+                   response.divisions[0].teams[i].id,
+                   response.divisions[0].teams[i].name,
+                   selectionChangedFunc(response.divisions[0].id, response.divisions[0].teams[i].id));
+    }
+
+    if (response.divisions.length > 0 && response.divisions[0].teams.length > 0)
+      selectionChanged(response.divisions[0].id, response.divisions[0].teams[0].id);
+  }
+
+  function teamLoaded(response) {
+    if (response.teams.length == 0)
+      return;
+
+    $("#adminteamdetails").find("h2").text(response.teams[0].name + " Team Details");
+
+    if (response.teams[0].prodcomps.length == 0) {
+      var entry = $("#templates .listentrynone").clone();
+      $("#adminteamdetails").find("#prodcomps").append(entry);
+    } else {
+      for (var i = 0; i < response.teams[0].prodcomps.length; i++) {
+        var text = response.teams[0].prodcomps[i].product;
+        if (response.teams[0].prodcomps[i].component)
+          text += ' / ' + response.teams[0].prodcomps[i].component;
+        newListEntry($("#adminteamdetails").find("#prodcomps"),
+                     "prodcomp",
+                     response.teams[0].prodcomps[i].id,
+                     text);
+      }
+    }
+
+    if (response.teams[0].members.length == 0) {
+      var entry = $("#templates .listentrynone").clone();
+      $("#adminteamdetails").find("#members").append(entry);
+    } else {
+      for (var i = 0; i < response.teams[0].members.length; i++) {
+        var text = "";
+        if (response.teams[0].members[i].nick)
+          text = response.teams[0].members[i].nick;
+        else
+          text = response.teams[0].members[i].name;        
+        newListEntry($("#adminteamdetails").find("#members"),
+                     "member",
+                     response.teams[0].members[i].id,
+                     text);
+      }
+    }
+  }
+  
+  function selectionChanged(divisionId, teamId) {
+    if (divisionId != -1 && currentDivisionId != divisionId) {
+      currentDivisionId = divisionId;
+      $("#adminteamlist").find(".entitylist").html("");
+      query_server("GET", "/division/" + divisionId, divisionLoaded);
+      var divisions = $("#admindivisionlist").find(".listentry");
+      for (var i = 0; i < divisions.length; i++) {
+        if ($(divisions[i]).attr("id") == "division" + divisionId)
+          $(divisions[i]).addClass("entityselected");
+        else
+          $(divisions[i]).removeClass("entityselected");
+      }
+    }
+    
+    if (teamId != -1 && currentTeamId != teamId) {
+      currentTeamId = teamId;
+      $("#adminteamdetails").find(".entitylist").html("");
+      query_server("GET", "/team/" + teamId, teamLoaded);
+      var teams = $("#adminteamlist").find(".listentry");
+      for (var i = 0; i < teams.length; i++) {
+        if ($(teams[i]).attr("id") == "team" + teamId)
+          $(teams[i]).addClass("entityselected");
+        else
+          $(teams[i]).removeClass("entityselected");
+      }
+    }
+  }
+  
+  function loadDivisions() {
+    query_server("GET", "/division/", divisionListLoaded);
+  }
+  
+  function update(_isAuthenticated) {
+    isAuthenticated = _isAuthenticated;
+    
+    current_who = require("app/who").get();
+    loadDivisions();
+  }
+  
+  var logoutCommand = {
+      name: "logout",
+      execute: function execute() {
+        require("app/login").set("", "");
+        var who = require("app/who").get();
+        update(false);
+      }
+    };
+
+  function productChanged() {
+    $("#select-comp").removeOption(/./);
+    var selectedProducts = $("#select-prod").selectedValues();
+    if (selectedProducts.length) {
+      if (selectedProducts.length == 1) {
+        $("#select-comp").attr("disabled", "");
+        $("#select-comp").addOption("", "-All-");
+        for (var i = 0; i < products[selectedProducts[0]].components.length; i++) {
+          $("#select-comp").addOption(products[selectedProducts[0]].components[i],
+                                      products[selectedProducts[0]].components[i]);
+        }
+        $("#select-comp").sortOptions();
+      } else if (selectedProducts.length > 1) {
+        $("#select-comp").attr("disabled", "disabled");
+        $("#select-comp").addOption("", "-All-");
+      }
+      $("#select-comp").attr("selectedIndex", 0);
+    }
+  }
+  
+  function productsLoaded(response) {
+    $("#select-prod").removeOption(/./);
+    products = response.products;
+    for (prod in products) {
+      $("#select-prod").addOption(prod, prod);
+    }
+    $("#select-prod").sortOptions();
+    $("#select-prod").change(productChanged);
+    $("#select-prod").attr("selectedIndex", 0);
+    productChanged();
+
+    $("#add-prodcomp form").submit(function (event) {
+      event.preventDefault();
+      addProdComp();
+    });
+  }
+  
+  function addProdComp() {
+    var data = [];
+    var selectedProducts = $("#select-prod").selectedValues();
+    var selectedComponents = $("#select-comp").selectedValues();
+    if (selectedProducts.length == 1) {
+      for (var i = 0; i < selectedComponents.length; i++)
+        data.push({team_id: currentTeamId, product: selectedProducts[0], component: selectedComponents[i]});
+    } else if (selectedProducts.length > 0) {
+      for (var i = 0; i < selectedProducts.length; i++)
+        data.push({team_id: currentTeamId, product: selectedProducts[i], component: ""});
+    }
+    
+    var teamId = currentTeamId;
+    currentTeamId = -1;  // force refresh
+    query_server("POST", "/prodcomp/", function(response) { selectionChanged(-1, teamId); },
+        JSON.stringify({prodcomps: data}));
+    $("#add-prodcomp").fadeOut();
+  }
+
+  $("#add-division form").submit(function (event) {
+    event.preventDefault();
+    currentDivisionId = -1;
+    query_server("POST", "/division/", loadDivisions,
+        JSON.stringify({divisions: [{name: $("#add-division-query").val()}]}));
+    $("#add-division").fadeOut();
+    $("#add-division-query").val("");
+  });
+  
+  $("#add-team form").submit(function (event) {
+    event.preventDefault();
+    var divisionId = currentDivisionId;
+    currentDivisionId = -1;
+    query_server("POST", "/team/", function(response) { selectionChanged(divisionId, -1); },
+        JSON.stringify({teams: [{name: $("#add-team-query").val(), division_id: divisionId}]}));
+    $("#add-team").fadeOut();
+    $("#add-team-query").val("");
+  });
+
+  $("#add-member .query").autocomplete(require("app/ui/find-user").options);
+
+  $("#add-member form").submit(
+    function(event) {
+      event.preventDefault();
+      var teamId = currentTeamId;
+      currentTeamId = -1;
+      var username = $("#add-member .query").val();
+      xhrQueue.enqueue(
+          function() {
+            return bugzilla.user(
+              username,
+              function(response) {
+                var nickPattern = /[\(\[][\s]*:([^\s\)]*)[\s]*[\)\]]/;
+                var nick = "";
+                var match = nickPattern.exec(response.real_name);
+                if (match)
+                  nick = match[1];
+                query_server("POST", "/member/", function(response) { selectionChanged(-1, teamId); },
+                    JSON.stringify(
+                        { members: [ {team_id: teamId, name: response.real_name, nick: nick, bugemail: response.email} ] }));
+                $("#add-member").fadeOut();
+                $("#add-member-query").val("");
+              });
+          });
+    });
+  
+  $("#del-team-cancel").click(function () { $("#del-entry").fadeOut(); });
+  
+  exports.init = function init() {
+    require("app/commands").register(logoutCommand);
+    require("app/login").whenChanged(
+      function changeUser(user) {
+        update(user.isAuthenticated);
+      });
+    query_server("GET", "/products/", productsLoaded);
+  };
+
+}
+
 Require.modules["app/ui/dashboard"] = function(exports, require) {
   var $ = require("jQuery");
   var cache = require("cache");
@@ -438,13 +770,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     this.results = {};
     
     this.queryDone = function(usernames, query) {
-      /*****
-      for (u in this.results[query.id]) {
-        var cacheKey = this.cacheId(u, query);
-        cache.set(cacheKey, this.results[query.id][u]);
-      }
-      */
-      cache.set(this.cacheId(usernames, query), this.results[query.id]);
+      //cache.set(this.cacheId(usernames, query), this.results[query.id]);
       this.queryDoneCb(usernames, query, this.results);
       this.decQueryCount();
     }
@@ -460,59 +786,24 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     
     this.parseResults = function(query, response) {
       this.results[query.id] = response.data;
-      /*
-      if ("get_values" in query)
-        query.get_values(this.results[query.id], response);
-      else {
-        for (b in response.bugs) {
-          var username = response.bugs[b][query.username_field]["name"];
-          if (username) {
-            for (u in this.results[query.id]) {
-              if (u.slice(0, username.length) == username) {
-                this.results[query.id][u]++;
-                break;
-              }
-            }
-          }
-        }
-      }*/
     }
     
     this.getStat = function(usernames, forceUpdate, query, getStatCb) {
       this.results[query.id] = 0;
-      /**
-      this.results[query.id] = {};
-      for (u in usernames)
-        this.results[query.id][usernames[u]] = 0;
-      
-      var uncachedUsernames = [];
-      for (u in usernames) {
-        var cacheKey = this.cacheId(usernames[u], query);
-        if (!forceUpdate && cache.haskey(cacheKey)) {
-          this.results[query.id][usernames[u]] = cache.get(this.cacheId(usernames[u], query));
-        }
-          uncachedUsernames.push(usernames[u]);
-      }
-      
-      if (uncachedUsernames.length == 0) {
-        this.queryDone(usernames, query);
-        return;
-      }
-      **/
       
       if (usernames.length == 0) {
         this.queryDone(usernames, query);
         return;
       }
 
-      if (!forceUpdate) {
-        var cacheKey = this.cacheId(usernames, query);
-        if (cache.haskey(cacheKey)) {
-          this.results[query.id] = cache.get(cacheKey);
-          this.queryDone(usernames, query);
-          return;
-        }
-      }
+//      if (!forceUpdate) {
+//        var cacheKey = this.cacheId(usernames, query);
+//        if (cache.haskey(cacheKey)) {
+//          this.results[query.id] = cache.get(cacheKey);
+//          this.queryDone(usernames, query);
+//          return;
+//        }
+//      }
       
       //var args = query.args(uncachedUsernames);
       //if ("include_fields" in query)
@@ -527,9 +818,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       var self = this;
       xhrQueue.enqueue(
         function() {
-          //return bugzilla.search(  XXXXXXXX
           return bugzilla.count(
-          ///// XXXXX
             newTerms,
             function(response) {
               self.parseResults(query, response);
@@ -574,11 +863,6 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     }
     
     this.queryDoneCb = function(usernames, query, results) {
-      /***
-      var total = 0;
-      for (u in this.userIds)
-        total += results[query.id][this.userIds[u]];
-        */
       var total = results[query.id];
       this.stats[query.id].find(".value").text(total);
       if ("threshold" in query) {

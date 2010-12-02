@@ -1,0 +1,261 @@
+<html>
+<head>
+  <meta http-equiv="Content-type" content="text/html; charset=utf-8"/>
+  <link rel="stylesheet" type="text/css" media="all"
+        href="css/jquery-ui.css" />
+  <link rel="stylesheet" type="text/css" media="all"
+        href="css/main.css" />
+  <link rel="stylesheet" type="text/css" media="all"
+        href="css/tipsy.css" />
+  <title>Bugzilla Dashboard Administration</title>
+</head>
+<body>
+<div id="header">
+  <h1 class="title">Bugzilla Dashboard Administration</h1>
+  <ul class="menu hide-while-loading">
+    <li data-dialog="login"
+        class="requires-no-auth"><span>Log In</span></li>
+    <li data-command="logout"
+        class="requires-auth-login"><span>Log Out (<span id="username"></span>)</span></li>
+ </ul>
+</div>
+<div id="loading-screen" class="loading">&nbsp;</div>
+<div class="admincol">
+
+<div class="adminpanel">
+  <div class="bolttopleft"></div><div class="bolttopright"></div><div class="boltbottomleft"></div><div class="boltbottomright"></div>
+  <div id="admindivisionlist" class="adminlist">
+    <h2>Divisions <button class="requires-auth-login adminadd adminbutton" type="button" data-dialog="add-division">add</button></h2>
+    <div class="entitylist"></div>
+  </div>
+</div>
+
+<div class="adminpanel">
+  <div class="bolttopleft"></div><div class="bolttopright"></div><div class="boltbottomleft"></div><div class="boltbottomright"></div>
+  <div id="adminteamlist" class="adminlist">
+    <h2>Teams <button class="requires-auth-login adminadd adminbutton" type="button" data-dialog="add-team">add</button></h2>
+    <div class="entitylist"></div>
+  </div>
+</div>
+
+</div>
+
+<div class="admincol">
+
+<div class="adminpanel">
+  <div class="bolttopleft"></div><div class="bolttopright"></div><div class="boltbottomleft"></div><div class="boltbottomright"></div>
+  <div id="adminteamdetails" class="adminlist">
+    <h2>Team Details</h2>
+    <h3>Products and Components <button class="requires-auth-login adminadd adminbutton" type="button" data-dialog="add-prodcomp">add</button></h3>
+    <div id="prodcomps" class="entitylist"></div>
+    <h3>Members <button class="requires-auth-login adminadd adminbutton" type="button" data-dialog="add-member">add</button></h3>
+    <div id="members" class="entitylist"></div>
+  </div>
+</div>
+
+</div>
+
+<div id="quickstatserrors">
+</div>
+<div id="login" class="dialog">
+  <div class="content">
+  <form id="login-form">
+  <p>Enter a user's Bugzilla information below. If you don't
+  provide a password, you'll only be able to see the user's
+  public bugs, and you also won't be able to use some of this
+  page's awesome functionality.</p>
+  <table>
+    <tr>
+      <td>Bugzilla Username</td>
+      <td><input type="text" class="username" id="login-username"/></td>
+    </tr>
+    <tr>
+      <td>Bugzilla Password</td>
+      <td><input type="password" class="password" id="login-password"/></td>
+    </tr>
+  </table>
+  <br/>
+  <input type="submit" id="login-submit" value="View Dashboard"/>
+  </form>
+  </div>
+</div>
+<div id="add-member" class="dialog">
+  <div class="content">
+  <form id="add-member-form">
+  <p>Type an email address below.</p>
+  <table>
+   <tr>
+      <td>Name</td>
+      <td><input type="text" class="query" id="add-member-query"/></td>
+    </tr>
+  </table>
+  <br/>
+  <input type="submit" id="add-member-submit"
+         value="Add"/>
+  </form>
+  </div>
+</div>
+<div id="add-prodcomp" class="dialog">
+  <div class="content">
+  <form id="add-prodcomp-form">
+  <table>
+   <tr>
+      <td>Product</td>
+      <td><select id="select-prod" multiple="multiple" size="5"></select></td>
+    </tr>
+   <tr>
+      <td>Component</td>
+      <td><select id="select-comp" multiple="multiple" size="5"></select></td>
+    </tr>
+  </table>
+  <br/>
+  <input type="submit" id="add-prodcomp-submit"
+         value="Add"/>
+  </form>
+  </div>
+</div>
+<div id="add-division" class="dialog">
+  <div class="content">
+  <form id="add-division-form">
+  <p>Type a division name below.</p>
+  <table>
+   <tr>
+      <td>Division</td>
+      <td><input type="text" id="add-division-query"/></td>
+    </tr>
+  </table>
+  <br/>
+  <input type="submit" id="add-division-submit"
+         value="Add"/>
+  </form>
+  </div>
+</div>
+<div id="add-team" class="dialog">
+  <div class="content">
+  <form id="add-team-form">
+  <p>Type a team name below.</p>
+  <table>
+   <tr>
+      <td>Team</td>
+      <td><input type="text" id="add-team-query"/></td>
+    </tr>
+  </table>
+  <br/>
+  <input type="submit" id="add-team-submit"
+         value="Add"/>
+  </form>
+  </div>
+</div>
+<div id="del-entry" class="dialog">
+  <div class="content">
+  <form id="del-entry-form">
+  <p>Delete <span id="del-entry-type"></span> <span id="del-entry-name"></span>?</p>
+  <br/>
+  <input type="button" id="del-team-cancel"
+         value="Cancel"/>
+  <input type="submit" id="del-team-submit"
+         value="OK"/>
+  </form>
+  </div>
+</div>
+<div id="errors"></div>
+<div id="templates">
+  <div class="listentry"><div class="listentrytext"></div><div class="listentrybutton nodisplay"><button class="requires-auth-login adminbutton buttondel" type="button"">delete</div></div>
+  <div class="listentrynone">none</div>
+  <table>
+    <tr class="detailedreport container hide-while-loading"></tr>
+    <tr class="teamlist container hide-while-loading"></tr>
+    <tr class="memberlist container hide-while-loading"></tr>
+    <tr><td class="reportcell"><div class="reportbox">
+      <div class="bolttopleft"></div><div class="bolttopright"></div><div class="boltbottomleft"></div><div class="boltbottomright"></div>
+      <h3 class="name">&nbsp;</h3>
+      <div class="reportboxtable">
+        <div class="stats">
+        </div>
+      </div>
+      <div class="indicator-panel"></div>
+    </div>
+    </td></tr>
+  </table>
+  <div class="errors">
+    <div class="bugzilla-api-error">I had trouble talking to Bugzilla.
+    Perhaps you entered the wrong username/password, or I
+    messed up.</div>
+    <div class="bugzilla-auth-error">Wrong username/password!</div>
+    <div class="unknown-error">An unknown error occurred.</div>
+ </div>
+  <div class="more-link"><span class="number"></span> more&hellip;</div>
+  <div class="bug-tooltip">
+    <div>
+      <span class="priority"></span>
+      <span class="severity"></span>
+    </div>
+    <div>
+      <span class="product"></span>
+      <span class="component"></span>
+    </div>
+    <div>Created <span class="age"></span></div>
+  </div>
+  <table class="bugs">
+    <tr class="header">
+      <th>Summary</th>
+      <th>Last&nbsp;Changed</th>
+    </tr>
+    <tr class="bug-row">
+      <td class="summary"></td>
+      <td class="last-changed"></td>
+    </tr>
+  </table>
+</div>
+</body>
+<!-- Base Scripts -->
+<script src="js/jquery.js"></script>
+<script src="js/require.js"></script>
+<script>
+$(window).ready(function() {
+  var moduleScriptNames = [
+    "app",
+    "queries",
+    "date-utils",
+    "cache",
+    "xhr",
+    "teams"
+  ];
+
+  var scripts = [
+    "js/jquery-ui.js",
+    "js/jquery.tipsy.js",
+    "js/jquery.selectboxes.js",
+    "js/bugzilla.js"
+  ];
+
+  moduleScriptNames.forEach(function(name) {
+    scripts.push("js/modules/" + name + ".js");
+  });
+
+  if (!('JSON' in window))
+    scripts.push("js/json2.js");
+
+  Require.preload(document, scripts, function whenLoaded() {
+    $("#loading-screen").hide();
+    $(".hide-while-loading").show();
+
+    var options = {
+      jQuery: jQuery,
+      Bugzilla: Bugzilla,
+      window: window,
+      admin: true
+    };
+
+    if (document.location.search == "?testing=1") {
+      window.parent.onDashboardLoaded(window, options);
+      return;
+    }
+
+    var moduleExports = {};
+    var require = Require.build(Require.modules, moduleExports);
+    require("app/loader").init(moduleExports, options);
+  });
+});
+</script>
+</html>

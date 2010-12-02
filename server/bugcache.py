@@ -4,7 +4,7 @@ import urllib
 BASE_BZAPI_URL = 'https://api-dev.bugzilla.mozilla.org/latest'
 QUERIES_TABLE = 'queries'
 
-CACHE_EXPIRY = datetime.timedelta(seconds=5*60)
+CACHE_EXPIRY = datetime.timedelta(seconds=30*60)
 
 class BugCache(object):
     
