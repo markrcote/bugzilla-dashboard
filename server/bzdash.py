@@ -19,6 +19,7 @@ BASE_BZAPI_URL = 'https://api-dev.bugzilla.mozilla.org/latest'
 bc = bugcache.BugCache(config.db, BASE_BZAPI_URL)
 
 urls = (
+    '/test/', 'test',
     '/bugcache(.*)', 'bugcache_handler',
     '/division/(.*)', 'division',
     '/team/(.*)', 'team',
@@ -91,6 +92,12 @@ class DashObject(JsonData):
 
     def DEL(self, id):
         db.delete(self.table, where=web.db.sqlwhere({'id': id}));
+
+
+class test(JsonData):
+    
+    def GET(self):
+        return self.do_json({'test': True}) 
 
 
 class division(DashObject):
