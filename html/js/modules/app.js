@@ -108,7 +108,17 @@ Require.modules["app/login"] = function(exports, require) {
     callbacks.forEach(function(cb) { cb(info); });
   };
   
+  var logoutCommand = {
+      name: "logout",
+      execute: function execute() {
+        require("app/login").set("", "");
+        var who = require("app/who").get();
+        update(false);
+      }
+    };
+  
   exports.init = function init() {
+    require("app/commands").register(logoutCommand);
     var cachedUsername = cache.get("username");
     var cachedPassword = cache.get("password");
     exports.set(cachedUsername, cachedPassword);
@@ -437,7 +447,6 @@ Require.modules["app/ui/hash"] = function(exports, require) {
 Require.modules["app/ui/admin"] = function(exports, require) {
   var server_url = "/bzdash";
   var $ = require("jQuery");
-  var dateUtils = require("date-utils");
   var bugzilla = require("bugzilla");
   var window = require("window");
   var xhrQueue = require("xhr/queue").create();
@@ -483,7 +492,6 @@ Require.modules["app/ui/admin"] = function(exports, require) {
         function() {
           dialog.find("input:first").focus();
         });
-      
     }
   }
 
@@ -513,6 +521,7 @@ Require.modules["app/ui/admin"] = function(exports, require) {
   }
   
   function divisionListLoaded(response) {
+    $("#admindivisionlist").removeClass("loading");
     $("#admindivisionlist").find(".entitylist").html("");
     
     for (var i = 0; i < response.divisions.length; i++) {
@@ -530,6 +539,7 @@ Require.modules["app/ui/admin"] = function(exports, require) {
   }
 
   function divisionLoaded(response) {
+    $("#adminteamlist").removeClass("loading");
     for (var i = 0; i < response.divisions[0].teams.length; i++) {
       newListEntry($("#adminteamlist").find(".entitylist"),
                    "team",
@@ -543,6 +553,7 @@ Require.modules["app/ui/admin"] = function(exports, require) {
   }
 
   function teamLoaded(response) {
+    $("#adminteamdetails").removeClass("loading");
     if (response.teams.length == 0)
       return;
 
@@ -580,55 +591,39 @@ Require.modules["app/ui/admin"] = function(exports, require) {
       }
     }
   }
+
+  function updateSelectedEntity(entities, id) {
+    for (var i = 0; i < entities.length; i++) {
+      if ($(entities[i]).attr("id") == id)
+        $(entities[i]).addClass("entityselected");
+      else
+        $(entities[i]).removeClass("entityselected");
+    }
+  }
   
   function selectionChanged(divisionId, teamId) {
     if (divisionId != -1 && currentDivisionId != divisionId) {
       currentDivisionId = divisionId;
+      $("#adminteamlist").addClass("loading");
       $("#adminteamlist").find(".entitylist").html("");
       query_server("GET", "/division/" + divisionId, divisionLoaded);
-      var divisions = $("#admindivisionlist").find(".listentry");
-      for (var i = 0; i < divisions.length; i++) {
-        if ($(divisions[i]).attr("id") == "division" + divisionId)
-          $(divisions[i]).addClass("entityselected");
-        else
-          $(divisions[i]).removeClass("entityselected");
-      }
+      updateSelectedEntity($("#admindivisionlist").find(".listentry"), "division" + divisionId);
     }
     
     if (teamId != -1 && currentTeamId != teamId) {
       currentTeamId = teamId;
+      $("#adminteamdetails").addClass("loading");
       $("#adminteamdetails").find(".entitylist").html("");
       query_server("GET", "/team/" + teamId, teamLoaded);
-      var teams = $("#adminteamlist").find(".listentry");
-      for (var i = 0; i < teams.length; i++) {
-        if ($(teams[i]).attr("id") == "team" + teamId)
-          $(teams[i]).addClass("entityselected");
-        else
-          $(teams[i]).removeClass("entityselected");
-      }
+      updateSelectedEntity($("#adminteamlist").find(".listentry"), "team" + teamId);
     }
   }
   
   function loadDivisions() {
+    $("#admindivisionlist").addClass("loading");
     query_server("GET", "/division/", divisionListLoaded);
   }
   
-  function update(_isAuthenticated) {
-    isAuthenticated = _isAuthenticated;
-    
-    current_who = require("app/who").get();
-    loadDivisions();
-  }
-  
-  var logoutCommand = {
-    name: "logout",
-    execute: function execute() {
-      require("app/login").set("", "");
-      var who = require("app/who").get();
-      update(false);
-    }
-  };
-
   function productChanged() {
     $("#select-comp").removeOption(/./);
     var selectedProducts = $("#select-prod").selectedValues();
@@ -706,35 +701,51 @@ Require.modules["app/ui/admin"] = function(exports, require) {
 
   $("#add-member .query").autocomplete(require("app/ui/find-user").options);
 
-  $("#add-member form").submit(
-    function(event) {
-      event.preventDefault();
-      var teamId = currentTeamId;
-      currentTeamId = -1;
-      var username = $("#add-member .query").val();
-      xhrQueue.enqueue(
-          function() {
-            return bugzilla.user(
-              username,
-              function(response) {
-                var nickPattern = /[\(\[][\s]*:([^\s\)]*)[\s]*[\)\]]/;
-                var nick = "";
-                var match = nickPattern.exec(response.real_name);
-                if (match)
-                  nick = match[1];
-                query_server("POST", "/member/", function(response) { selectionChanged(-1, teamId); },
-                    JSON.stringify(
-                        { members: [ {team_id: teamId, name: response.real_name, nick: nick, bugemail: response.email} ] }));
-                $("#add-member").fadeOut();
-                $("#add-member-query").val("");
-              });
-          });
-    });
+  $("#add-member form").submit(function(event) {
+    event.preventDefault();
+    var teamId = currentTeamId;
+    currentTeamId = -1;
+    var username = $("#add-member .query").val();
+    xhrQueue.enqueue(
+      function() {
+        return bugzilla.user(
+          username,
+          function(response) {
+            // extract nick if present, e.g. "Jane Doe [:jdoe]", "John Smith ( :jsmith )", etc. 
+            var nickPattern = /[\(\[][\s]*:([^\s\)]*)[\s]*[\)\]]/;
+            var nick = "";
+            var match = nickPattern.exec(response.real_name);
+            if (match)
+              nick = match[1];
+            query_server("POST", "/member/", function(response) { selectionChanged(-1, teamId); },
+                JSON.stringify(
+                    { members: [ {team_id: teamId, name: response.real_name, nick: nick, bugemail: response.email} ] }));
+            $("#add-member").fadeOut();
+            $("#add-member-query").val("");
+          }
+        );
+      }
+    );
+  });
   
   $("#del-team-cancel").click(function () { $("#del-entry").fadeOut(); });
-  
+
+  var dashboardCommand = {
+      name: "dashboard",
+      execute: function execute() {
+        window.open("index.html");  
+      }
+    };
+
+  function update(_isAuthenticated) {
+    isAuthenticated = _isAuthenticated;
+    
+    current_who = require("app/who").get();
+    loadDivisions();
+  }
+
   exports.init = function init() {
-    require("app/commands").register(logoutCommand);
+    require("app/commands").register(dashboardCommand);
     require("app/login").whenChanged(
       function changeUser(user) {
         update(user.isAuthenticated);
@@ -747,7 +758,6 @@ Require.modules["app/ui/admin"] = function(exports, require) {
 Require.modules["app/ui/dashboard"] = function(exports, require) {
   var $ = require("jQuery");
   var cache = require("cache");
-  var dateUtils = require("date-utils");
   var bugzilla = require("bugzilla");
   var window = require("window");
   var xhrQueue = require("xhr/queue").create();
@@ -1251,15 +1261,6 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     }
   };
   
-  var logoutCommand = {
-    name: "logout",
-    execute: function execute() {
-      require("app/login").set("", "");
-      var who = require("app/who").get();
-      update(who, false, true);
-    }
-  };
-
   var myStatsCommand = {
     name: "mystats",
     execute: function execute() {
@@ -1278,7 +1279,6 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
 
   exports.init = function init() {
     require("app/commands").register(refreshCommand);
-    require("app/commands").register(logoutCommand);
     require("app/commands").register(myStatsCommand);
     require("app/commands").register(topCommand);
     require("app/who").whenChanged(
