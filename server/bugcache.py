@@ -1,22 +1,22 @@
 import datetime
 import urllib
 
-BASE_BZAPI_URL = 'https://api-dev.bugzilla.mozilla.org/latest'
 QUERIES_TABLE = 'queries'
 
 CACHE_EXPIRY = datetime.timedelta(seconds=30*60)
 
 class BugCache(object):
     
-    def __init__(self, db):
+    def __init__(self, db, bzapi_url):
         self.db = db
+        self.bzapi_url = bzapi_url
     
     def check_cache(self, search_string):
         return self.db.select(QUERIES_TABLE, vars={'search': search_string},
                               where="search = $search")
     
     def load_data(self, search_string):
-        url = BASE_BZAPI_URL + search_string
+        url = self.bzapi_url + search_string
         #print 'url is %s' % url
         json_data = urllib.urlopen(url).read()
         

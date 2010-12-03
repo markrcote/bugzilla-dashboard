@@ -113,7 +113,6 @@ Require.modules["app/login"] = function(exports, require) {
       execute: function execute() {
         require("app/login").set("", "");
         var who = require("app/who").get();
-        update(false);
       }
     };
   
@@ -148,6 +147,11 @@ Require.modules["app/errors"] = function(exports, require) {
       errors.fadeIn();
     else
       message.fadeIn();
+  };
+  
+  exports.clear = function clear() {
+    errors.html("");
+    errors.fadeOut();
   };
 };
 
@@ -213,12 +217,26 @@ Require.modules["app/ui/login-form"] = function(exports, require) {
   var cachedUsername = $("#login .username").val();
   var cachedPassword = $("#login .password").val();
 
+  function loginLoaded(response) {
+    $("#login-form").removeClass("loading");
+    if (!response.error) {
+      require("app/login").set($("#login .username").val(),
+          $("#login .password").val());
+      require("app/errors").clear();
+      $("#login").fadeOut();
+    } else {
+      if (response.code == 300) {
+        require("app/errors").log("bugzilla-auth-error");
+      }
+    }
+  }
+  
   $("#login form").submit(
     function(event) {
       event.preventDefault();
-      require("app/login").set($("#login .username").val(),
-                               $("#login .password").val());
-      $("#login").fadeOut();
+      $("#login-form").addClass("loading");
+      require("app/server").query("POST", "/login/", loginLoaded,
+          JSON.stringify({login: {username: $("#login .username").val(), password: $("#login .password").val()}}));
     });
 
   require("app/login").whenChanged(
@@ -444,19 +462,11 @@ Require.modules["app/ui/hash"] = function(exports, require) {
   };
 };
 
-Require.modules["app/ui/admin"] = function(exports, require) {
+Require.modules["app/server"] = function(exports, require) {
   var server_url = "/bzdash";
-  var $ = require("jQuery");
-  var bugzilla = require("bugzilla");
-  var window = require("window");
   var xhrQueue = require("xhr/queue").create();
-  var isAuthenticated = false;  // set by update()
-  var products = {};
 
-  var currentDivisionId = -1;
-  var currentTeamId = -1;
-
-  function query_server(method, search, onLoad, body) {
+  exports.query = function query(method, search, onLoad, body) {
     var xhrData = {
         method: method,
         url: server_url + search,
@@ -475,6 +485,21 @@ Require.modules["app/ui/admin"] = function(exports, require) {
       }
     );
   }
+};
+
+
+Require.modules["app/ui/admin"] = function(exports, require) {
+  var $ = require("jQuery");
+  var bugzilla = require("bugzilla");
+  var window = require("window");
+  var xhrQueue = require("xhr/queue").create();
+  var server = require("app/server");
+  var isAuthenticated = false;  // set by update()
+  var products = {};
+
+  var currentDivisionId = -1;
+  var currentTeamId = -1;
+
 
   function selectionChangedFunc(divId, teamId) {
     if (teamId === undefined)
@@ -498,7 +523,7 @@ Require.modules["app/ui/admin"] = function(exports, require) {
   function delEntryFunc(dialog, entry, entryType, id) {
     return function(event) {
       event.preventDefault();
-      query_server("DEL", "/" + entryType + "/" + id);
+      server.query("DEL", "/" + entryType + "/" + id);
       entry.remove();
       dialog.fadeOut();
     };
@@ -606,7 +631,7 @@ Require.modules["app/ui/admin"] = function(exports, require) {
       currentDivisionId = divisionId;
       $("#adminteamlist").addClass("loading");
       $("#adminteamlist").find(".entitylist").html("");
-      query_server("GET", "/division/" + divisionId, divisionLoaded);
+      server.query("GET", "/division/" + divisionId, divisionLoaded);
       updateSelectedEntity($("#admindivisionlist").find(".listentry"), "division" + divisionId);
     }
     
@@ -614,14 +639,14 @@ Require.modules["app/ui/admin"] = function(exports, require) {
       currentTeamId = teamId;
       $("#adminteamdetails").addClass("loading");
       $("#adminteamdetails").find(".entitylist").html("");
-      query_server("GET", "/team/" + teamId, teamLoaded);
+      server.query("GET", "/team/" + teamId, teamLoaded);
       updateSelectedEntity($("#adminteamlist").find(".listentry"), "team" + teamId);
     }
   }
   
   function loadDivisions() {
     $("#admindivisionlist").addClass("loading");
-    query_server("GET", "/division/", divisionListLoaded);
+    server.query("GET", "/division/", divisionListLoaded);
   }
   
   function productChanged() {
@@ -675,7 +700,7 @@ Require.modules["app/ui/admin"] = function(exports, require) {
     
     var teamId = currentTeamId;
     currentTeamId = -1;  // force refresh
-    query_server("POST", "/prodcomp/", function(response) { selectionChanged(-1, teamId); },
+    server.query("POST", "/prodcomp/", function(response) { selectionChanged(-1, teamId); },
         JSON.stringify({prodcomps: data}));
     $("#add-prodcomp").fadeOut();
   }
@@ -683,7 +708,7 @@ Require.modules["app/ui/admin"] = function(exports, require) {
   $("#add-division form").submit(function (event) {
     event.preventDefault();
     currentDivisionId = -1;
-    query_server("POST", "/division/", loadDivisions,
+    server.query("POST", "/division/", loadDivisions,
         JSON.stringify({divisions: [{name: $("#add-division-query").val()}]}));
     $("#add-division").fadeOut();
     $("#add-division-query").val("");
@@ -693,7 +718,7 @@ Require.modules["app/ui/admin"] = function(exports, require) {
     event.preventDefault();
     var divisionId = currentDivisionId;
     currentDivisionId = -1;
-    query_server("POST", "/team/", function(response) { selectionChanged(divisionId, -1); },
+    server.query("POST", "/team/", function(response) { selectionChanged(divisionId, -1); },
         JSON.stringify({teams: [{name: $("#add-team-query").val(), division_id: divisionId}]}));
     $("#add-team").fadeOut();
     $("#add-team-query").val("");
@@ -717,7 +742,7 @@ Require.modules["app/ui/admin"] = function(exports, require) {
             var match = nickPattern.exec(response.real_name);
             if (match)
               nick = match[1];
-            query_server("POST", "/member/", function(response) { selectionChanged(-1, teamId); },
+            server.query("POST", "/member/", function(response) { selectionChanged(-1, teamId); },
                 JSON.stringify(
                     { members: [ {team_id: teamId, name: response.real_name, nick: nick, bugemail: response.email} ] }));
             $("#add-member").fadeOut();
@@ -750,7 +775,7 @@ Require.modules["app/ui/admin"] = function(exports, require) {
       function changeUser(user) {
         update(user.isAuthenticated);
       });
-    query_server("GET", "/products/", productsLoaded);
+    server.query("GET", "/products/", productsLoaded);
   };
 
 }

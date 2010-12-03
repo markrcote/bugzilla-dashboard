@@ -1,6 +1,7 @@
 import inspect
 import os.path
 import sys
+import urllib
 
 def execution_path(filename):
   return os.path.join(os.path.dirname(inspect.getfile(sys._getframe(1))), filename)
@@ -12,7 +13,9 @@ import json
 import web
 import bugcache
 
-bc = bugcache.BugCache(config.db)
+BASE_BZAPI_URL = 'https://api-dev.bugzilla.mozilla.org/latest'
+
+bc = bugcache.BugCache(config.db, BASE_BZAPI_URL)
 
 urls = (
     '/bugcache(.*)', 'bugcache_handler',
@@ -20,7 +23,8 @@ urls = (
     '/team/(.*)', 'team',
     '/prodcomp/(.*)', 'prodcomp',
     '/member/(.*)', 'member',
-    '/products/', 'products'
+    '/products/', 'products',
+    '/login/', 'login'
 )
 app = web.application(urls, globals())
 application = web.application(urls, globals()).wsgifunc()
@@ -38,7 +42,16 @@ class bugcache_handler:
         return results
 
 
-class DashObject(object):
+class JsonData(object):
+
+    def do_json(self, data):
+        results = json.dumps(data) 
+        web.header('Content-Length', len(results))
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        return results
+    
+
+class DashObject(JsonData):
 
     table = ''
     
@@ -75,12 +88,6 @@ class DashObject(object):
     def get_subtable(self, table, id):
         return [dict(db.select(table, where=web.db.sqlwhere({'id': id}))[0])]
 
-    def do_json(self, data):
-        results = json.dumps(data) 
-        web.header('Content-Length', len(results))
-        web.header('Content-Type', 'application/json; charset=utf-8')
-        return results
-    
     def DEL(self, id):
         db.delete(self.table, where=web.db.sqlwhere({'id': id}));
 
@@ -129,7 +136,7 @@ class member(DashObject):
         return self._get(id, [('teams', 'team_id')])
 
 
-class products(DashObject):
+class products(JsonData):
     
     def GET(self):
         val = bc.get('/configuration')
@@ -140,6 +147,18 @@ class products(DashObject):
             result['products'][k] = {'components': comps}
         return self.do_json(result) 
 
+
+class login(JsonData):
+    
+    def POST(self):
+        login_data = json.loads(web.data())['login']
+        # To verify, we just need to do any old request with the username and password.
+        url = '%s/user/%s?username=%s&password=%s' % (BASE_BZAPI_URL, login_data['username'],
+                                                      login_data['username'], login_data['password'])
+        response = json.loads(urllib.urlopen(url).read())
+        if 'error' in response:
+            return self.do_json(response)
+        return self.do_json({'error': 0})
 
 if __name__ == "__main__":
     app.run()
