@@ -1,7 +1,8 @@
-#!/bin/env python2.6
+#!/usr/bin/env python2.6
 import inspect
 import os.path
 import sys
+import web
 
 def execution_path(filename):
   return os.path.join(os.path.dirname(inspect.getfile(sys._getframe(1))), filename)
