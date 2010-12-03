@@ -1,14 +1,4 @@
-#!/usr/bin/env python2.6
-import inspect
-import os.path
-import sys
 import urllib
-
-def execution_path(filename):
-  return os.path.join(os.path.dirname(inspect.getfile(sys._getframe(1))), filename)
-
-sys.path.append(execution_path(''))
-
 import config
 import json
 import web
@@ -28,8 +18,8 @@ urls = (
     '/products/', 'products',
     '/login/', 'login'
 )
+
 app = web.application(urls, globals())
-application = web.application(urls, globals()).wsgifunc()
 db = config.db
 
 class bugcache_handler:
@@ -167,6 +157,3 @@ class login(JsonData):
         if 'error' in response:
             return self.do_json(response)
         return self.do_json({'error': 0})
-
-if __name__ == "__main__":
-    app.run()
