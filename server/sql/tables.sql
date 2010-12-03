@@ -1,36 +1,40 @@
 CREATE TABLE queries (
-    id serial primary key,
-    search text,
-    results longtext,
-    lastmod timestamp default now()
+    id INT AUTO_INCREMENT,
+    PRIMARY KEY (id)
+    search TEXT,
+    results LONGTEXT,
+    lastmod TIMESTAMP DEFAULT now()
 );
 
 CREATE TABLE divisions (
-	id serial primary key,
-	name text
+    id INT AUTO_INCREMENT,
+    PRIMARY KEY (id)
+    name TEXT
 );
 
 CREATE TABLE teams (
-	id serial primary key,
-	name text,
-	division_id int,
-	foreign key (division_id) references divisions(id)
+    id INT AUTO_INCREMENT,
+    PRIMARY KEY (id)
+	name TEXT,
+	division_id INT,
+	FOREIGN KEY (division_id) REFERENCES divisions(id)
 );
 
 CREATE TABLE prodcomps (
-	id serial primary key,
-	product text,
-	component text,
-	team_id int,
-	foreign key (team_id) references teams(id)
+    id INT AUTO_INCREMENT,
+    PRIMARY KEY (id)
+	product TEXT,
+	component TEXT,
+	team_id INT,
+	FOREIGN KEY (team_id) REFERENCES teams(id)
 );
 
 CREATE TABLE members (
-	id serial primary key,
-	name text,
-	bugemail text,
-	nick text,
-	team_id int,
-	foreign key (team_id) references teams(id)
+    id INT AUTO_INCREMENT,
+    PRIMARY KEY (id)
+	name TEXT,
+	bugemail TEXT,
+	nick TEXT,
+	team_id INT,
+	FOREIGN KEY (team_id) REFERENCES teams(id)
 );
-
