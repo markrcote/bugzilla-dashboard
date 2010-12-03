@@ -670,6 +670,7 @@ Require.modules["app/ui/admin"] = function(exports, require) {
   }
   
   function productsLoaded(response) {
+    $("#add-prodcomp-form").removeClass("loading");
     $("#select-prod").removeOption(/./);
     products = response.products;
     for (prod in products) {
@@ -737,11 +738,17 @@ Require.modules["app/ui/admin"] = function(exports, require) {
           username,
           function(response) {
             // extract nick if present, e.g. "Jane Doe [:jdoe]", "John Smith ( :jsmith )", etc. 
-            var nickPattern = /[\(\[][\s]*:([^\s\)]*)[\s]*[\)\]]/;
+            // some people skip the parentheses/brackets... in the interests of not making
+            // the first re more complicated, we use two patterns.
             var nick = "";
-            var match = nickPattern.exec(response.real_name);
-            if (match)
-              nick = match[1];
+            var nickPatterns = [/[\(\[][\s]*:([^\s\)]*)[\s]*[\)\]]/, /:([\S]*)/];
+            for (var i = 0; i < nickPatterns.length; i++) {
+              var match = nickPatterns[i].exec(response.real_name);
+              if (match) {
+                nick = match[1];
+                break;
+              }
+            }
             server.query("POST", "/member/", function(response) { selectionChanged(-1, teamId); },
                 JSON.stringify(
                     { members: [ {team_id: teamId, name: response.real_name, nick: nick, bugemail: response.email} ] }));
@@ -775,6 +782,7 @@ Require.modules["app/ui/admin"] = function(exports, require) {
       function changeUser(user) {
         update(user.isAuthenticated);
       });
+    $("#add-prodcomp-form").addClass("loading");
     server.query("GET", "/products/", productsLoaded);
   };
 
