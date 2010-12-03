@@ -17,53 +17,43 @@
         class="requires-no-auth"><span>Log In</span></li>
     <li data-command="logout"
         class="requires-auth-login"><span>Log Out (<span id="username"></span>)</span></li>
- </ul>
+  </ul>
 </div>
 <div id="loading-screen" class="loading">&nbsp;</div>
 <div class="admincol">
-
 <div class="adminpanel">
   <div class="bolttopleft"></div><div class="bolttopright"></div><div class="boltbottomleft"></div><div class="boltbottomright"></div>
   <div id="admindivisionlist" class="adminlist">
-    <h2>Divisions <button class="requires-auth-login adminadd adminbutton" type="button" data-dialog="add-division">add</button></h2>
+    <h2>Divisions <button class="requires-auth-login adminadd adminbutton" type="button" data-dialog="add-division">+</button></h2>
     <div class="entitylist"></div>
   </div>
 </div>
-
 <div class="adminpanel">
   <div class="bolttopleft"></div><div class="bolttopright"></div><div class="boltbottomleft"></div><div class="boltbottomright"></div>
   <div id="adminteamlist" class="adminlist">
-    <h2>Teams <button class="requires-auth-login adminadd adminbutton" type="button" data-dialog="add-team">add</button></h2>
+    <h2>Teams <button class="requires-auth-login adminadd adminbutton" type="button" data-dialog="add-team">+</button></h2>
     <div class="entitylist"></div>
   </div>
 </div>
-
 </div>
-
 <div class="admincol">
-
 <div class="adminpanel">
   <div class="bolttopleft"></div><div class="bolttopright"></div><div class="boltbottomleft"></div><div class="boltbottomright"></div>
   <div id="adminteamdetails" class="adminlist">
     <h2>Team Details</h2>
-    <h3>Products and Components <button class="requires-auth-login adminadd adminbutton" type="button" data-dialog="add-prodcomp">add</button></h3>
+    <h3>Products and Components <button class="requires-auth-login adminadd adminbutton" type="button" data-dialog="add-prodcomp">+</button></h3>
     <div id="prodcomps" class="entitylist"></div>
-    <h3>Members <button class="requires-auth-login adminadd adminbutton" type="button" data-dialog="add-member">add</button></h3>
+    <h3>Members <button class="requires-auth-login adminadd adminbutton" type="button" data-dialog="add-member">+</button></h3>
     <div id="members" class="entitylist"></div>
   </div>
 </div>
-
 </div>
-
 <div id="quickstatserrors">
 </div>
 <div id="login" class="dialog">
   <div class="content">
   <form id="login-form">
-  <p>Enter a user's Bugzilla information below. If you don't
-  provide a password, you'll only be able to see the user's
-  public bugs, and you also won't be able to use some of this
-  page's awesome functionality.</p>
+  <p>Log in with your Bugzilla username and password.</p>
   <table>
     <tr>
       <td>Bugzilla Username</td>
@@ -75,7 +65,7 @@
     </tr>
   </table>
   <br/>
-  <input type="submit" id="login-submit" value="View Dashboard"/>
+  <input type="submit" id="login-submit" value="Log In"/>
   </form>
   </div>
 </div>
@@ -160,23 +150,8 @@
 </div>
 <div id="errors"></div>
 <div id="templates">
-  <div class="listentry"><div class="listentrytext"></div><div class="listentrybutton nodisplay"><button class="requires-auth-login adminbutton buttondel" type="button"">delete</div></div>
+  <div class="listentry"><div class="listentrytext"></div><div class="listentrybutton nodisplay"><button class="requires-auth-login adminbutton buttondel" type="button"">&ndash;</div></div>
   <div class="listentrynone">none</div>
-  <table>
-    <tr class="detailedreport container hide-while-loading"></tr>
-    <tr class="teamlist container hide-while-loading"></tr>
-    <tr class="memberlist container hide-while-loading"></tr>
-    <tr><td class="reportcell"><div class="reportbox">
-      <div class="bolttopleft"></div><div class="bolttopright"></div><div class="boltbottomleft"></div><div class="boltbottomright"></div>
-      <h3 class="name">&nbsp;</h3>
-      <div class="reportboxtable">
-        <div class="stats">
-        </div>
-      </div>
-      <div class="indicator-panel"></div>
-    </div>
-    </td></tr>
-  </table>
   <div class="errors">
     <div class="bugzilla-api-error">I had trouble talking to Bugzilla.
     Perhaps you entered the wrong username/password, or I
@@ -184,28 +159,6 @@
     <div class="bugzilla-auth-error">Wrong username/password!</div>
     <div class="unknown-error">An unknown error occurred.</div>
  </div>
-  <div class="more-link"><span class="number"></span> more&hellip;</div>
-  <div class="bug-tooltip">
-    <div>
-      <span class="priority"></span>
-      <span class="severity"></span>
-    </div>
-    <div>
-      <span class="product"></span>
-      <span class="component"></span>
-    </div>
-    <div>Created <span class="age"></span></div>
-  </div>
-  <table class="bugs">
-    <tr class="header">
-      <th>Summary</th>
-      <th>Last&nbsp;Changed</th>
-    </tr>
-    <tr class="bug-row">
-      <td class="summary"></td>
-      <td class="last-changed"></td>
-    </tr>
-  </table>
 </div>
 </body>
 <!-- Base Scripts -->

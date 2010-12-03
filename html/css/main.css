@@ -340,12 +340,6 @@ div.reportbox {
     border: 1px inset black;
 }
 
-#admindivisionlist {
-}
-
-#adminteamlist {
-}
-
 div.listentry {
     display: table-row;
 }
@@ -401,9 +395,6 @@ div.entitylist {
     border-collapse: collapse;
 }
 
-.entitylist tr {
-}
-
 .entitylist th {
     text-align: left;
 }
@@ -416,3 +407,4 @@ div.entitylist {
 button.adminbutton {
 	font-size: 6pt;
 }
+
