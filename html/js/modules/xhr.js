@@ -17,7 +17,7 @@ Require.modules["xhr/queue"] = function(exports, require) {
         for (i in this.xhrData.onErr)
           this.xhrData.onErr[i](responseText);
       } else if (responseType == "log") {
-        console.log(responseText);
+        //console.log(responseText);
         return;
       }
       this.active = false;

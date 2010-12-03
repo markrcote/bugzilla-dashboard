@@ -253,8 +253,6 @@ Require.modules["app/ui/find-user"] = function(exports, require) {
         response(suggs);
       }
       if (currReq) {
-        console.log('aborting job');
-        console.dir(currReq);
         xhrQueue.abort(currReq);
       }
       if (!request.term)
@@ -263,8 +261,6 @@ Require.modules["app/ui/find-user"] = function(exports, require) {
                                data: {match: request.term},
                                success: success});
       currReq = xhrQueue.enqueue(function() { return request; });
-      console.log('starting job');
-      console.dir(currReq);
     }
   };
 
@@ -499,7 +495,6 @@ Require.modules["app/ui/admin"] = function(exports, require) {
       dialog.fadeOut();
     };
   }
-
   
   function newListEntry(parent, entryType, id, text, onclick) {
     var entry = $("#templates .listentry").clone();
@@ -626,13 +621,13 @@ Require.modules["app/ui/admin"] = function(exports, require) {
   }
   
   var logoutCommand = {
-      name: "logout",
-      execute: function execute() {
-        require("app/login").set("", "");
-        var who = require("app/who").get();
-        update(false);
-      }
-    };
+    name: "logout",
+    execute: function execute() {
+      require("app/login").set("", "");
+      var who = require("app/who").get();
+      update(false);
+    }
+  };
 
   function productChanged() {
     $("#select-comp").removeOption(/./);
