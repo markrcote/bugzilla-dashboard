@@ -53,7 +53,10 @@ class DashObject(JsonData):
             for k in keys_to_check:
                 where_dict[k] = e[k]
             if not where_dict or not db.select(self.table, where=web.db.sqlwhere(where_dict)):
-                db.insert(self.table, **e)
+                cols = {}
+                for k, v in e.iteritems():
+                    cols[k.encode('ascii')] = v
+                db.insert(self.table, **cols)
 
     def _get(self, id, subtables=[], supertables=[]):
         if id:
@@ -72,7 +75,10 @@ class DashObject(JsonData):
 
     def PUT(self, id):
         for i in json.loads(web.data())[self.table]:
-            db.update(self.table, where=web.db.sqlwhere({'id': id}), **i)
+            cols = {}
+            for k, v in i.iteritems():
+                cols[k.encode('ascii')] = v
+            db.update(self.table, where=web.db.sqlwhere({'id': id}), **cols)
 
     def get_supertable(self, table, id, foreign_key):
         return map(lambda x: dict(x), db.select(table, where=web.db.sqlwhere({foreign_key: id})))
