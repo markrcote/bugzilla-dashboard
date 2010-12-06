@@ -412,6 +412,28 @@ Require.modules["app/ui"] = function(exports, require) {
   };
 };
 
+Require.modules["app/ui/sort"] = function(exports) {
+  exports.sortByKey = function sortByKey(keyname) {
+    return function(a, b) {
+      if (a[keyname] < b[keyname])
+        return -1;
+      if (a[keyname] == b[keyname])
+        return 0;
+      return 1;
+    };
+  };
+  
+  exports.sortUsers = function sortUsers(a, b) {
+    var key_a = "nick" in a ? a.nick : a.name;
+    var key_b = "nick" in b ? b.nick : b.name;
+    if (key_a < key_b)
+      return -1;
+    else if (key_a == key_b)
+      return 0;
+    return 1;
+  };
+};
+
 Require.modules["app/ui/hash"] = function(exports, require) {
   
   function userFromHash(location) {
@@ -563,6 +585,7 @@ Require.modules["app/ui/admin"] = function(exports, require) {
     $("#admindivisionlist").removeClass("loading");
     $("#admindivisionlist").find(".entitylist").html("");
     
+    response.divisions.sort(require("app/ui/sort").sortByKey("name"));
     for (var i = 0; i < response.divisions.length; i++) {
       newListEntry($("#admindivisionlist").find(".entitylist"),
                    "division",
@@ -579,6 +602,7 @@ Require.modules["app/ui/admin"] = function(exports, require) {
 
   function divisionLoaded(response) {
     $("#adminteamlist").removeClass("loading");
+    response.divisions[0].teams.sort(require("app/ui/sort").sortByKey("name"));
     for (var i = 0; i < response.divisions[0].teams.length; i++) {
       newListEntry($("#adminteamlist").find(".entitylist"),
                    "team",
@@ -602,6 +626,7 @@ Require.modules["app/ui/admin"] = function(exports, require) {
       var entry = $("#templates .listentrynone").clone();
       $("#adminteamdetails").find("#prodcomps").append(entry);
     } else {
+      response.teams[0].prodcomps.sort(require("app/ui/sort").sortByKey("name"));
       for (var i = 0; i < response.teams[0].prodcomps.length; i++) {
         var text = response.teams[0].prodcomps[i].product;
         if (response.teams[0].prodcomps[i].component)
@@ -617,6 +642,7 @@ Require.modules["app/ui/admin"] = function(exports, require) {
       var entry = $("#templates .listentrynone").clone();
       $("#adminteamdetails").find("#members").append(entry);
     } else {
+      response.teams[0].members.sort(require("app/ui/sort").sortUsers);
       for (var i = 0; i < response.teams[0].members.length; i++) {
         var text = "";
         if (response.teams[0].members[i].nick)
@@ -1217,13 +1243,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     teamReports = [];
     var reportCount = 0;
     var row = null;
-    teams.sort(function(a, b) {
-      if (a.name < b.name)
-        return -1;
-      else if (a.name == b.name)
-        return 0;
-      return 1;
-    });
+    teams.sort(require("app/ui/sort").sortByKey("name"));
     for (t in teams) {
       if ((reportCount++ % REPORTS_PER_ROW) == 0) {
         row = template.clone();
@@ -1242,15 +1262,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     userReports = [];
     var reportCount = 0;
     var row = null;
-    users.sort(function(a, b) {
-      var key_a = "nick" in a ? a.nick : a.name;
-      var key_b = "nick" in b ? b.nick : b.name;
-      if (key_a < key_b)
-        return -1;
-      else if (key_a == key_b)
-        return 0;
-      return 1;
-    });
+    users.sort(require("app/ui/sort").sortUsers);
     for (u in users) {
       if ((reportCount++ % REPORTS_PER_ROW) == 0) {
         row = template.clone();
