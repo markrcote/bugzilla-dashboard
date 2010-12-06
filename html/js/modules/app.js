@@ -781,7 +781,7 @@ Require.modules["app/ui/admin"] = function(exports, require) {
             // some people skip the parentheses/brackets... in the interests of not making
             // the first re more complicated, we use two patterns.
             var nick = "";
-            var nickPatterns = [/[\(\[][\s]*:([^\s\)]*)[\s]*[\)\]]/, /:([\S]*)/];
+            var nickPatterns = [/[\(\[][\s]*:([^\s\):,]*)[\s]*[\)\]]/, /:([^\s,:]*)/];
             for (var i = 0; i < nickPatterns.length; i++) {
               var match = nickPatterns[i].exec(response.real_name);
               if (match) {
