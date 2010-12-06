@@ -1201,7 +1201,6 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     teamReports = [];
     var reportCount = 0;
     var row = null;
-    console.log('got divisions: ' + divisions.length);
     for (d in divisions) {
       if ((reportCount++ % REPORTS_PER_ROW) == 0) {
         row = template.clone();
@@ -1283,8 +1282,6 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       $("#header .title").text(title);
     }
 
-    console.dir(who);
-
     if (who.division != -1) {
       teamReports = [];
       var divisions = require("teams").get();
@@ -1296,7 +1293,6 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         }
       }
       if (!division) {
-        console.log("no division");
         return;  // FIXME: proper error
       }
       var report = new TeamReport(who.division, division, true, "division");
@@ -1324,7 +1320,6 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
           break;
       }
       if (!team) {
-        console.log("no team");
         return;  // FIXME: proper error
       }
       var report = new TeamReport(who.team, team, true);
@@ -1356,7 +1351,6 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       }
       if (!user)
         return;
-      console.dir(user);
       var report = new UserReport(who.user, user, true);
       userReports.push(report);
       report.update(detailedReportContainer, forceUpdate);
