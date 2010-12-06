@@ -1,3 +1,4 @@
+#!/usr/bin/env python2.6
 import urllib
 import config
 import json
@@ -46,6 +47,7 @@ class JsonData(object):
 class DashObject(JsonData):
 
     table = ''
+    subobjects = []
     
     def add_if_not_found(self, entities, keys_to_check):
         for e in entities:
@@ -58,20 +60,24 @@ class DashObject(JsonData):
                     cols[k.encode('ascii')] = v
                 db.insert(self.table, **cols)
 
-    def _get(self, id, subtables=[], supertables=[]):
+    def _get(self, id):
+        return self.do_json(self.get_dict(id))
+
+    def get_dict(self, id, key='id'):
         if id:
-            where = web.db.sqlwhere({'id': id})
+            where = web.db.sqlwhere({key: id})
         else:
             where = None
         response = []
         for i in db.select(self.table, where=where):
             d = dict(i)
-            for t in subtables:
-                d[t[0]] = self.get_subtable(t[0], d[t[1]])
-            for t in supertables:
-                d[t[0]] = self.get_supertable(t[0], d['id'], t[1])
+            for t in self.subobjects:
+                cls = globals()[t[0]]
+                if not issubclass(cls, DashObject):
+                    continue
+                d.update(cls().get_dict(d['id'], t[1]))
             response.append(d)
-        return self.do_json({self.table: response})
+        return {self.table: response}
 
     def PUT(self, id):
         for i in json.loads(web.data())[self.table]:
@@ -79,12 +85,6 @@ class DashObject(JsonData):
             for k, v in i.iteritems():
                 cols[k.encode('ascii')] = v
             db.update(self.table, where=web.db.sqlwhere({'id': id}), **cols)
-
-    def get_supertable(self, table, id, foreign_key):
-        return map(lambda x: dict(x), db.select(table, where=web.db.sqlwhere({foreign_key: id})))
-
-    def get_subtable(self, table, id):
-        return [dict(db.select(table, where=web.db.sqlwhere({'id': id}))[0])]
 
     def DEL(self, id):
         db.delete(self.table, where=web.db.sqlwhere({'id': id}));
@@ -99,23 +99,25 @@ class test(JsonData):
 class division(DashObject):
     
     table = 'divisions'
+    subobjects = [('team', 'division_id')]
     
     def POST(self, id=None):
         self.add_if_not_found(json.loads(web.data())['divisions'], ('name',))
     
     def GET(self, id):
-        return self._get(id, [], [('teams', 'division_id')])
+        return self._get(id)
 
 
 class team(DashObject):
     
     table = 'teams'
+    subobjects = [('member', 'team_id'), ('prodcomp', 'team_id')]
     
     def POST(self, id=None):
         self.add_if_not_found(json.loads(web.data())['teams'], ('name',))
 
     def GET(self, id):
-        return self._get(id, [('divisions', 'division_id')], [('members', 'team_id'), ('prodcomps', 'team_id')])
+        return self._get(id)
 
 
 class prodcomp(DashObject):
@@ -126,7 +128,7 @@ class prodcomp(DashObject):
         self.add_if_not_found(json.loads(web.data())['prodcomps'], ('product', 'component', 'team_id'))
     
     def GET(self, id):
-        return self._get(id, [('teams', 'team_id')], [])
+        return self._get(id)
 
 
 class member(DashObject):
@@ -137,7 +139,7 @@ class member(DashObject):
         self.add_if_not_found(json.loads(web.data())['members'], [])
 
     def GET(self, id):
-        return self._get(id, [('teams', 'team_id')])
+        return self._get(id)
 
 
 class products(JsonData):
@@ -163,3 +165,6 @@ class login(JsonData):
         if 'error' in response:
             return self.do_json(response)
         return self.do_json({'error': 0})
+
+if __name__ == '__main__':
+    app.run()

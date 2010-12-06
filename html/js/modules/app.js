@@ -34,8 +34,9 @@ Require.modules["app/loader"] = function(exports, require) {
 Require.modules["app/who"] = function(exports, require) {
   var callbacks = [];
   var who = {
-    user: "",
-    group: ""
+    division: -1,
+    team: -1,
+    user: -1
   };
 
   exports.get = function get() {
@@ -46,9 +47,19 @@ Require.modules["app/who"] = function(exports, require) {
     callbacks.push(cb);
   };
 
-  exports.set = function set(username, groupname) {
-    who.user = username;
-    who.group = groupname;
+  exports.set = function set(divisionId, teamId, userId) {
+    if (!divisionId)
+      who.division = -1;
+    else
+      who.division = divisionId;
+    if (!teamId)
+      who.team = -1;
+    else
+      who.team = teamId;
+    if (!userId)
+      who.user = -1;
+    else
+      who.user = userId;
 
     callbacks.forEach(function(cb) { cb(who); });
   }
@@ -298,7 +309,7 @@ Require.modules["app/ui/find-user"] = function(exports, require) {
     function(event) {
       event.preventDefault();
       var username = $("#find-user .query").val();
-      var url = require("app/ui/hash").usernameToHash(username);
+      var url = require("app/ui/hash").userToHash(username);
       window.open(url);
     });
 
@@ -402,51 +413,54 @@ Require.modules["app/ui"] = function(exports, require) {
 };
 
 Require.modules["app/ui/hash"] = function(exports, require) {
-  function usernameFromHash(location) {
+  
+  function userFromHash(location) {
     if (location.hash) {
-      var match = location.hash.match(/#username=(.*)/);
+      var match = location.hash.match(/#user=(.*)/);
       if (match)
         return unescape(match[1]);
     }
-    return "";
+    return -1;
   }
 
-  function groupnameFromHash(location) {
+  function teamFromHash(location) {
     if (location.hash) {
-      var match = location.hash.match(/#groupname=(.*)/);
+      var match = location.hash.match(/#team=(.*)/);
       if (match)
         return unescape(match[1]);
     }
-    return "";
+    return -1;
+  }
+
+  function divisionFromHash(location) {
+    if (location.hash) {
+      var match = location.hash.match(/#division=(.*)/);
+      if (match)
+        return unescape(match[1]);
+    }
+    return -1;
   }
 
   function setWhoFromHash(location) {
-      var user = usernameFromHash(location);
-      var group = groupnameFromHash(location);
-      require("app/who").set(user, group);
+    var division = divisionFromHash(location);
+    var team = teamFromHash(location);
+    var user = userFromHash(location);
+    require("app/who").set(division, team, user);
   }
 
-  exports.usernameToHash = function usernameToHash(username) {
-    return "#username=" + escape(username);
+  exports.userToHash = function userToHash(userId) {
+    return "#user=" + escape(userId);
   };
   
-  exports.groupnameToHash = function groupnameToHash(groupname) {
-    return "#groupname=" + escape(groupname);
+  exports.teamToHash = function teamToHash(teamId) {
+    return "#team=" + escape(teamId);
+  };
+
+  exports.divisionToHash = function divisionToHash(divisionId) {
+    return "#division=" + escape(divisionId);
   };
 
   exports.init = function init(document) {
-    require("app/login").whenChanged(
-      function(user) {
-      /*
-        if (user.isLoggedIn) {
-          var hash = exports.usernameToHash(user.username);
-          if (document.location.hash != hash)
-            document.location.hash = hash;
-        } else
-          document.location.hash = "";
-      */
-      });
-
     var window = document.defaultView;
 
     function onHashChange() {
@@ -1083,14 +1097,27 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     $("#todo").fadeIn();    
   }
   
-  function TeamReport(teamId, team, detailed, topLevel) {
+  function TeamReport(teamId, team, detailed, topLevel, groupType) {
     Report.call(this, teamId, team.name, detailed, topLevel);
     this.team = team;
     this.indicatorLoaders = [];
     this.detailed = detailed;
+    if (groupType)
+      this.groupType = groupType;
+    else
+      this.groupType = "team";
     
     this.usernames = function () {
-      return require("teams").getMembers(this.team).map(function(x) { return x[1]; });
+      var i;
+      var l = [];
+      if ("members" in this.team)
+        l = l.concat(this.team.members.map(function(x) { return x.bugemail; }));
+      if ("teams" in this.team) {
+        for (i = 0; i < this.team.teams.length; i++) {
+          l = l.concat(this.team.teams[i].members.map(function(x) { return x.bugemail; }));
+        }
+      }
+      return l;
     };
     
     this.createToDo = function () {
@@ -1104,38 +1131,11 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         this.createToDo();
       this.name_entry.addClass("pagelink");
       var self = this;
-      this.name_entry.click(function() { window.open(require("app/ui/hash").groupnameToHash(self.id)); });
+      if (this.groupType == "team")
+        this.name_entry.click(function() { window.open(require("app/ui/hash").teamToHash(self.id)); });
+      else
+        this.name_entry.click(function() { window.open(require("app/ui/hash").divisionToHash(self.id)); });
       this.displayQueries(selector, forceUpdate);
-      /*
-      var indicatorPanel = this.entry.find(".indicator-panel");
-      
-      if ("teams" in this.team) {
-        var indicators = [];
-        for (t in this.team.teams)
-          indicators.push({
-            text: this.team.teams[t].short_form,
-            tip: this.team.teams[t].name,
-            link: require("app/ui/hash").groupnameToHash(this.id + "/teams/" + t),
-            usernames: require("teams").getMembers(this.team.teams[t]).map(function(x) { return x[1]; })
-          });
-        this.displayIndicators(indicatorPanel, indicators);
-      }
-  
-      if ("members" in this.team) {
-        var indicators = [];
-        for (m in this.team.members)
-          indicators.push({
-            text: require("teams").memberShortName(this.team.members[m][0]),
-            tip: this.team.members[m][0],
-            link: require("app/ui/hash").usernameToHash(this.id + "/members/" + m),
-            usernames: [this.team.members[m][1]]
-          });
-        this.displayIndicators(indicatorPanel, indicators);
-      }
-
-      for (i in this.indicatorLoaders)
-        this.indicatorLoaders[i].go(forceUpdate);
-      */
     };
 
     this.displayIndicators = function (indicatorPanel, indicatorList) {
@@ -1167,12 +1167,12 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
   }
   TeamReport.prototype = new Report;
 
-  function UserReport(userPath, user, detailed) {
-    Report.call(this, user[1], user[0], detailed, false);
-    this.userPath = userPath;
+  function UserReport(userId, user, detailed) {
+    Report.call(this, userId, user.nick ? user.nick : user.name, detailed, false);
+    this.user = user;
     
     this.usernames = function () {
-      return [this.id];
+      return [this.user.bugemail];
     }
 
     this._allDoneCb = function () {
@@ -1195,25 +1195,43 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
 
   var teamReports = [];
   var userReports = [];
-  
-  function teamList(selector, template, forceUpdate, baseTeamId, teams) {
-    var topLevel = false;
-    if (!teams) {
-      teams = require("app/teams").get();
-      topLevel = true;
-    }
+
+  function divisionList(selector, template, forceUpdate) {
+    var divisions = require("app/teams").get();
     teamReports = [];
     var reportCount = 0;
     var row = null;
+    console.log('got divisions: ' + divisions.length);
+    for (d in divisions) {
+      if ((reportCount++ % REPORTS_PER_ROW) == 0) {
+        row = template.clone();
+        selector.append(row);
+      }
+      var divisionId = divisions[d].id;
+      var report = new TeamReport(divisionId, divisions[d], false, true, "division");
+      teamReports.push(report);
+      report.update(row, forceUpdate);
+    }
+  }
+
+  function teamList(selector, template, forceUpdate, teams) {
+    teamReports = [];
+    var reportCount = 0;
+    var row = null;
+    teams.sort(function(a, b) {
+      if (a.name < b.name)
+        return -1;
+      else if (a.name == b.name)
+        return 0;
+      return 1;
+    });
     for (t in teams) {
       if ((reportCount++ % REPORTS_PER_ROW) == 0) {
         row = template.clone();
         selector.append(row);
       }
-      var teamId = t;
-      if (baseTeamId)
-        teamId = baseTeamId + "/teams/" + t;
-      var report = new TeamReport(teamId, teams[t], false, topLevel);
+      var teamId = teams[t].id;
+      var report = new TeamReport(teamId, teams[t], false, false);
       teamReports.push(report);
       report.update(row, forceUpdate);
     }
@@ -1221,18 +1239,25 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
 
   var REPORTS_PER_ROW = 6;
   
-  function userList(selector, template, forceUpdate, baseTeamId, users) {
+  function userList(selector, template, forceUpdate, users) {
     userReports = [];
     var reportCount = 0;
     var row = null;
+    users.sort(function(a, b) {
+      var key_a = "nick" in a ? a.nick : a.name;
+      var key_b = "nick" in b ? b.nick : b.name;
+      if (key_a < key_b)
+        return -1;
+      else if (key_a == key_b)
+        return 0;
+      return 1;
+    });
     for (u in users) {
       if ((reportCount++ % REPORTS_PER_ROW) == 0) {
         row = template.clone();
         selector.append(row);
       }
-      var userId = "";
-      if (baseTeamId)
-        userId = baseTeamId + "/members/" + users[u];
+      var userId = users[u].id;
       var report = new UserReport(userId, users[u], false);
       userReports.push(report);
       report.update(row, forceUpdate);
@@ -1258,31 +1283,85 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       $("#header .title").text(title);
     }
 
-    if (who.group) {
+    console.dir(who);
+
+    if (who.division != -1) {
       teamReports = [];
-      var team = require("teams").getByKey(who.group);
-      var report = new TeamReport(who.group, team, true);
+      var divisions = require("teams").get();
+      var division = null;
+      for (i = 0; i < divisions.length; i++) {
+        if (divisions[i].id == who.division) {
+          division = divisions[i];
+          break;
+        }
+      }
+      if (!division) {
+        console.log("no division");
+        return;  // FIXME: proper error
+      }
+      var report = new TeamReport(who.division, division, true, "division");
       var teamCount = 0;
       teamReports.push(report);
       report.update(detailedReportContainer, forceUpdate);
-      if ("teams" in team) {
-        teamList($("#reports"), teamListTemplate, forceUpdate, who.group, team.teams);
-        for (t in team.teams)
+      if ("teams" in division) {
+        teamList($("#reports"), teamListTemplate, forceUpdate, division.teams);
+        for (t in division.teams)
           teamCount += 1;
         report.entry.attr("colspan", teamCount);
       }
+    } else if (who.team != -1) {
+      teamReports = [];
+      var divisions = require("teams").get();
+      var team = null;
+      for (i = 0; i < divisions.length; i++) {
+        for (j = 0; j < divisions[i].teams.length; j++) {
+          if (divisions[i].teams[j].id == who.team) {
+            team = divisions[i].teams[j];
+            break;
+          }
+        }
+        if (team)
+          break;
+      }
+      if (!team) {
+        console.log("no team");
+        return;  // FIXME: proper error
+      }
+      var report = new TeamReport(who.team, team, true);
+      var teamCount = 0;
+      teamReports.push(report);
+      report.update(detailedReportContainer, forceUpdate);
       if ("members" in team) {
-        userList($("#reports"), memberListTemplate, forceUpdate, who.group, team.members);
+        userList($("#reports"), memberListTemplate, forceUpdate, team.members);
         if (team.members.length > teamCount)
           report.entry.attr("colspan", team.members.length);
       }
-    } else if (who.user) {
+    } else if (who.user != -1) {
       userReports = [];
-      var report = new UserReport(require("teams").getByKey(who.user));
+      var divisions = require("teams").get();
+      var user = null;
+      for (i = 0; i < divisions.length; i++) {
+        for (j = 0; j < divisions[i].teams.length; j++) {
+          for (k = 0; k < divisions[i].teams[j].members.length; k++) {
+            if (divisions[i].teams[j].members[k].id == who.user) {
+              user = divisions[i].teams[j].members[k];
+              break;
+            }
+          }
+          if (user)
+            break;
+        }
+        if (user)
+          break;
+      }
+      if (!user)
+        return;
+      console.dir(user);
+      var report = new UserReport(who.user, user, true);
       userReports.push(report);
-      report.update(container, forceUpdate);
+      report.update(detailedReportContainer, forceUpdate);
     } else
-      teamList($("#reports"), teamListTemplate, forceUpdate);
+      divisionList($("#reports"), teamListTemplate, forceUpdate);
   };
 
   var refreshCommand = {
@@ -1298,7 +1377,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     name: "mystats",
     execute: function execute() {
       var user = require("app/login").get();
-      var url = require("app/ui/hash").usernameToHash(user.username);
+      var url = require("app/ui/hash").userToHash(user.username);
       window.open(url);
     }
   };
@@ -1325,5 +1404,12 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         var who = require("app/who").get();
         update(who, user.isAuthenticated, false);
       });
+    require("teams").whenChanged(
+      function changeTeams(divisions) {
+        var user = require("app/login").get();
+        var who = require("app/who").get();
+        update(who, user.isAuthenticated, false);
+      });
+    require("teams").loadTeams();
   };
 };
