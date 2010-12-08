@@ -12,4 +12,11 @@ function testDateUtils() {
     ),
     "just now"
   );
+  equals(
+      dateUtils.prettyDate(
+        "2010-04-13T18:02:00Z",
+        new Date("Tue, 13 Apr 2010 18:52:00 GMT")
+      ),
+      "50 minutes ago"
+    );
 }

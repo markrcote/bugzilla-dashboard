@@ -828,6 +828,60 @@ Require.modules["app/ui/admin"] = function(exports, require) {
 
 }
 
+Require.modules["app/ui/mostactive"] = function(exports, require) {
+  var $ = require("jQuery");
+  var bugzilla = require("bugzilla");
+  var xhrQueue = require("xhr/queue").create();
+  var afterdate;
+  var callback = null;
+  var bugs = [];
+
+  function translateTerms(args) {
+    var newTerms = {};
+    for (name in args)
+      newTerms[name.replace(/_DOT_/g, ".").replace(/_HYPH_/g, "-")] = args[name];
+    return newTerms;
+  }
+  
+  function onLoad(response) {
+    var change_count;
+    var i;
+    var j;
+    for (i = 0; i < response.bugs.length; i++) {
+      response.bugs[i].change_count = 0;
+      for (j = 0; j < response.bugs[i].comments.length; j++) {
+        if (response.bugs[i].comments[j].creation_time >= afterdate)
+          response.bugs[i].change_count++;
+      }
+      for (j = 0; j < response.bugs[i].history.length; j++) {
+        if (response.bugs[i].history[j].change_time >= afterdate)
+          response.bugs[i].change_count++;
+      }
+      response.bugs[i].comments = [];
+      response.bugs[i].history = [];
+    }
+    
+    response.bugs.sort(function(a, b) {return b.change_count - a.change_count;});
+    if (callback)
+      callback(response.bugs);
+  }
+  
+  exports.get = function get(cb, prodcomps) {
+    callback = cb;
+    afterdate = require("date-utils").timeAgo(MS_PER_DAY * 7);
+    var query = require("queries").queries["changed_last_week"]();
+    var args = query.args(prodcomps);
+    args["include_fields"] = "id,summary,comments,history,status,priority,severity,last_change_time";
+    var newTerms = translateTerms(args);
+    
+    xhrQueue.enqueue(
+      function() {
+        return bugzilla.search(newTerms, onLoad);
+      });
+  };
+  
+}
+
 Require.modules["app/ui/dashboard"] = function(exports, require) {
   var $ = require("jQuery");
   var cache = require("cache");
@@ -838,18 +892,19 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
   
   var startTime;
 
-  function QueryRunner(forceUpdate, usernames, queryInitCb, queryDoneCb, allDoneCb, queries) {
+  // FIXME: Should probably be a separate (sub)module.
+  function QueryRunner(forceUpdate, usernames, prodcomps, queryInitCb, queryDoneCb, allDoneCb, queries) {
     // FIXME: Could probably split this into another object per query.
     this.usernames = usernames.slice(0);
+    this.prodcomps = prodcomps.slice(0);
     this.queryInitCb = queryInitCb;
     this.queryDoneCb = queryDoneCb;
     this.allDoneCb = allDoneCb;
     this.queryCount = 0;
     this.results = {};
     
-    this.queryDone = function(usernames, query) {
-      //cache.set(this.cacheId(usernames, query), this.results[query.id]);
-      this.queryDoneCb(usernames, query, this.results);
+    this.queryDone = function(query) {
+      this.queryDoneCb(query, this.results);
       this.decQueryCount();
     }
     
@@ -858,41 +913,24 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         this.allDoneCb(this.results);
     }
 
-    this.cacheId = function(usernames, query) {
-      return usernames.join("") + "_" + (isAuthenticated ? "PRIVATE" : "PUBLIC") + "/" + query.id;
-    }
-    
     this.parseResults = function(query, response) {
       this.results[query.id] = response.data;
     }
     
-    this.getStat = function(usernames, forceUpdate, query, getStatCb) {
+    this.getStat = function(forceUpdate, query, getStatCb) {
       this.results[query.id] = 0;
       
-      if (usernames.length == 0) {
-        this.queryDone(usernames, query);
+      if (!query.to_do && this.usernames.length == 0) {
+        this.queryDone(query);
         return;
       }
 
-//      if (!forceUpdate) {
-//        var cacheKey = this.cacheId(usernames, query);
-//        if (cache.haskey(cacheKey)) {
-//          this.results[query.id] = cache.get(cacheKey);
-//          this.queryDone(usernames, query);
-//          return;
-//        }
-//      }
-      
-      //var args = query.args(uncachedUsernames);
-      //if ("include_fields" in query)
-      //  args.include_fields = query.include_fields;
-      var args = query.args(usernames);
+      if (query.to_do)
+        var args = query.args(this.prodcomps);
+      else
+        var args = query.args(this.usernames);
       var newTerms = translateTerms(args);
       
-      var priority = require("queries").DEFAULT_PRIORITY;
-      if ("priority" in query)
-        priority = query.priority;
-
       var self = this;
       xhrQueue.enqueue(
         function() {
@@ -900,9 +938,9 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
             newTerms,
             function(response) {
               self.parseResults(query, response);
-              self.queryDone(usernames, query);
+              self.queryDone(query);
             });
-        }, priority);
+        });
     }
     
     if (!queries) {
@@ -917,15 +955,16 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     this.queryCount = queries.length;
     var self = this;
     for (q in queries) {
-      this.queryInitCb(this.usernames, queries[q]);
-      this.getStat(this.usernames, forceUpdate, queries[q],
-          function(usernames, query, value) {
-            self.queryDone(usernames, query, value);
+      this.queryInitCb(queries[q]);
+      this.getStat(forceUpdate, queries[q],
+          function(query, value) {
+            self.queryDone(query, value);
           }
         );
     }
   }
   
+  // FIXME: Move threshold-colourizer stuff out and into Report classes.
   function IndicatorLoader(userIds, indicatorBox) {
     this.indicatorBox = indicatorBox;
     this.userIds = userIds.slice(0);
@@ -973,19 +1012,13 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     }
   }
   
+  // FIXME: Should these be classic JS objects, or should they inherit another way?
   function Report(id, name, detailed, topLevel) {
     this.id = id;
     this.name = name;
     this.detailed = detailed;
     this.topLevel = topLevel;
-    
-    this.parentTeam = function () {
-      // In the form .../<superteam>/teams/<team>
-      var paths = this.id.split("/");
-      if (paths.length < 3 || paths.slice(-2, -1) != "teams")
-        return "";
-      return paths.slice(-3, -2);
-    };
+    this.toDo = [];
     
     this.displayedQueries = [ 
       { type: "group", name: "Blockers", members: [                       
@@ -1000,14 +1033,26 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       { type: "stat", name: "Review Queue", query: "review_queue"}
     ];
     
+    this.stuffToDoQueries = [
+      { type: "stat", name: "Top Crashers", query: "topcrash" },
+      { type: "stat", name: "Blocker Noms", query: "open_noms" },
+      { type: "stat", name: "Critical Security", query: "sg_crit" },
+      { type: "stat", name: "Assigned to Nobody", query: "nobody" }
+    ];
+    
     this.setupReportDisplay = function (selector) {
-      this.entry = $("#templates td.reportcell").clone();
-      var reportbox = this.entry.find(".reportbox");
+      if (this.detailed)
+      {
+        this.entry = $("#templates td.detailedreportcell").clone();
+      } else {
+        this.entry = $("#templates td.reportcell").clone();
+      }
       
       this.name_entry = this.entry.find(".name")
       this.name_entry.text(this.name);
       this.name_entry.addClass("loading");
       this.stats = this.entry.find(".stats");
+      this.stats.addClass("nodisplay");
       if (this.topLevel) {
         var interimRelName = $("#templates .statsentry").clone();
         interimRelName.find(".name").text("Next Interim Release");
@@ -1022,9 +1067,17 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       }
       selector.append(this.entry);
       if (this.detailed) {
+        var reportbox = this.entry.find(".detailedreportbox");
         this.entry.attr("colspan", "0");
         this.details = $("#templates .reportdetails").clone();
         reportbox.find(".reportboxtable").append(this.details);
+        this.toDo[0] = $("#templates .detailedreportfield").clone();
+        this.toDo[0].find(".name").text("Stuff to do...");
+        this.toDo[1] = $("#templates .detailedreportfield").clone();
+        this.toDo[1].find(".name").text("Most Active Bugs");
+        this.toDo[1].find(".name").addClass("loading");
+        $(reportbox.find(".detailedreportrow")).append(this.toDo[0]);
+        $(reportbox.find(".detailedreportrow")).append(this.toDo[1]);
       }
     };
 
@@ -1032,20 +1085,78 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       return id.replace(/@/g, "").replace(/\./g, "").replace(/_/g, "").replace(/\//g, "");
     };
     
-    this.queryDoneCb = function (usernames, query, results) {
-      /***
-      var total = 0;
-      for (u in results[query.id])
-        total += results[query.id][u];
-      */
+    this.queryDoneCb = function (query, results) {
       var total = results[query.id];
       $("#" + this.cleanId(this.id + query.id)).find(".value").text(total);
     };
     
+    this.showBugs = function showBugs(bugs) {
+      var table = $("#templates .bugs").clone();
+      var rowTemplate = table.find(".bug-row").remove();
+
+      function updatePrettyDates(query) {
+        query.find(".last-changed").each(
+          function() {
+            var lcTime = $(this).attr("data-last-change");
+            $(this).text(require("date-utils").prettyDate(lcTime));
+          });
+      }
+      
+      function appendRowForBug(bug) {
+        var row = rowTemplate.clone();
+        row.attr("id", "bug-id-" + bug.id);
+        var summary = bug.summary;
+        if (summary.length > 25)
+          summary = bug.summary.slice(0, 50) + "...";
+        row.find(".summary").text(bug.id + ": " + summary);
+        row.addClass("status-" + bug.status);
+        if (bug.priority != "--") {
+          row.addClass(bug.priority);
+          row.addClass(bug.severity);
+        }
+        row.find(".last-changed").attr("data-last-change",
+                                       bug.last_change_time);
+        row.click(
+          function onClick() {
+            window.open(bugzilla.getShowBugURL(bug.id));
+          });
+
+        row.hover(
+          function onIn() {
+            var tooltip = $("#templates .bug-tooltip").clone();
+            tooltip.find(".priority").text(bug.priority);
+            // TODO: Show more information in tooltip.
+            $(this).append(tooltip);
+          },
+          function onOut() {
+            $(this).find(".bug-tooltip").remove();
+          });
+        
+        table.append(row);
+      }
+      
+      bugs.forEach(appendRowForBug);
+      updatePrettyDates(table);
+      return table;
+    }
+    
+    this.mostActiveLoaded = function(most_active) {
+      this.toDo[1].append(this.showBugs(most_active.slice(0, 9)));
+      this.toDo[1].find(".name").removeClass("loading");
+    }
+    
     this.allDoneCb = function() {
       this.name_entry.removeClass("loading");
+      this.entry.find(".stats").css('visibility','visible').hide().fadeIn('slow');
+
+      this.entry.find(".stats").removeClass("nodisplay");
+      this.entry.find(".stats").fadeIn();
       //var d = new Date();
       //console.log("Report " + this.name + " loaded in " + ((d.getTime() - startTime)/1000) + " s");
+      var self = this;
+      if (this.detailed) {
+        require("app/ui/mostactive").get(function(bugs) { self.mostActiveLoaded(bugs); }, this.prodcomps());
+      }
     };
     
     this.getIndent = function (indentLevel) {
@@ -1057,10 +1168,10 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       return indent;
     };
     
-    this.displayEntry = function(selector, queries, entry, indentLevel) {
+    this.displayEntry = function(selector, queries, entry, indentLevel, toDoQuery) {
       switch (entry.type) {
         case "group": this.displayGroup(selector, queries, entry, indentLevel); break;
-        case "stat": this.displayStat(selector, queries, entry, indentLevel); break;
+        case "stat": this.displayStat(selector, queries, entry, indentLevel, toDoQuery); break;
       }
     };
     
@@ -1086,7 +1197,10 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       var query = require("queries").queries[stat.query]();
       queries.push(query);
       entry.find(".indent").html(indent);
-      entry.click(function() { window.open(bugzilla.uiQueryUrl(translateTerms(query.args(self.usernames())))); });
+      if (query.to_do)
+        entry.click(function() { window.open(bugzilla.uiQueryUrl(translateTerms(query.args(self.prodcomps())))); });
+      else
+        entry.click(function() { window.open(bugzilla.uiQueryUrl(translateTerms(query.args(self.usernames())))); });
       entry.attr("id", this.cleanId(this.id + query.id));
       entry.addClass("pagelink");
       entry.find(".name").text(stat.name);
@@ -1096,23 +1210,30 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     
     this.displayQueries = function (selector, forceUpdate) {
       this.selector = selector;
+      var i;
       var self = this;
       var queries = [];
       var previousWasGroup = false; 
       
-      for (i in this.displayedQueries) {
+      for (i = 0; i < this.displayedQueries.length; i++) {
         if (previousWasGroup) {
           var sep = $("#templates .statsgroupsep").clone();
           this.stats.append(sep);
         }
-        this.displayEntry(this.stats, queries, this.displayedQueries[i], 0, previousWasGroup);
+        this.displayEntry(this.stats, queries, this.displayedQueries[i], 0, false);
         previousWasGroup = (this.displayedQueries[i].type == "group"); 
       }
       
+      if (this.detailed) {
+        for (i = 0; i < this.stuffToDoQueries.length; i++) {
+          this.displayEntry(this.toDo[0], queries, this.stuffToDoQueries[i], 0, true);
+        }
+      }
+      
       this.QueryRunner = new QueryRunner(
-          forceUpdate, this.usernames(),
-          function(usernames, query) { },
-          function(usernames, query, value) { self.queryDoneCb(usernames, query, value); },
+          forceUpdate, this.usernames(), this.prodcomps(),
+          function(query) { },
+          function(query, value) { self.queryDoneCb(query, value); },
           function() { self.allDoneCb(); }, queries);
     };
   }
@@ -1144,6 +1265,19 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         }
       }
       return l;
+    };
+
+    this.prodcomps = function () {
+      var teams = [this.team];
+      var prodcomps = [];
+      var i;
+      if ("teams" in this.team)
+        teams = teams.concat(this.team.teams);
+      for (i = 0; i < teams.length; i++) {
+        if ("prodcomps" in teams[i])
+          prodcomps = prodcomps.concat(teams[i].prodcomps.map(function(x) { return [x.product, x.component]; }));
+      }
+      return prodcomps;
     };
     
     this.createToDo = function () {
@@ -1199,16 +1333,20 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     
     this.usernames = function () {
       return [this.user.bugemail];
-    }
+    };
 
+    this.prodcomps = function () {
+      return [];
+    };
+    
     this._allDoneCb = function () {
       this.name_entry.removeClass("loading");
-    }
+    };
     
     this.update = function (selector, forceUpdate) {
       this.setupReportDisplay(selector);
       this.displayQueries(selector, forceUpdate);
-    }
+    };
   }
   UserReport.prototype = new Report;
   
@@ -1222,6 +1360,17 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
   var teamReports = [];
   var userReports = [];
 
+  var REPORTS_PER_ROW = 6;
+  
+  function fillRow(row, rowCount) {
+    var entry;
+    while ((rowCount++ % REPORTS_PER_ROW) != 0) {
+      entry = $("#templates td.reportcell").clone();
+      entry.addClass("nodisplay");
+      row.append(entry);
+    }
+  }
+  
   function divisionList(selector, template, forceUpdate) {
     var divisions = require("app/teams").get();
     teamReports = [];
@@ -1237,13 +1386,15 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       teamReports.push(report);
       report.update(row, forceUpdate);
     }
-  }
+    fillRow(row, reportCount);
+}
 
   function teamList(selector, template, forceUpdate, teams) {
     teamReports = [];
     var reportCount = 0;
     var row = null;
     teams.sort(require("app/ui/sort").sortByKey("name"));
+    
     for (t in teams) {
       if ((reportCount++ % REPORTS_PER_ROW) == 0) {
         row = template.clone();
@@ -1254,10 +1405,9 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       teamReports.push(report);
       report.update(row, forceUpdate);
     }
+    fillRow(row, reportCount);
   }
 
-  var REPORTS_PER_ROW = 6;
-  
   function userList(selector, template, forceUpdate, users) {
     userReports = [];
     var reportCount = 0;
@@ -1273,6 +1423,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       userReports.push(report);
       report.update(row, forceUpdate);
     }
+    fillRow(row, reportCount);
   }
  
   function update(who, _isAuthenticated, forceUpdate) {
@@ -1308,14 +1459,11 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         return;  // FIXME: proper error
       }
       var report = new TeamReport(who.division, division, true, "division");
-      var teamCount = 0;
       teamReports.push(report);
       report.update(detailedReportContainer, forceUpdate);
       if ("teams" in division) {
         teamList($("#reports"), teamListTemplate, forceUpdate, division.teams);
-        for (t in division.teams)
-          teamCount += 1;
-        report.entry.attr("colspan", teamCount);
+        report.entry.attr("colspan", REPORTS_PER_ROW);
       }
     } else if (who.team != -1) {
       teamReports = [];
@@ -1340,8 +1488,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       report.update(detailedReportContainer, forceUpdate);
       if ("members" in team) {
         userList($("#reports"), memberListTemplate, forceUpdate, team.members);
-        if (team.members.length > teamCount)
-          report.entry.attr("colspan", team.members.length);
+        report.entry.attr("colspan", REPORTS_PER_ROW);
       }
     } else if (who.user != -1) {
       userReports = [];

@@ -110,27 +110,25 @@ table, caption {
     font-variant: inherit;
 }
 
-.reports table {
+.bugs {
     width: 100%;
     border-collapse: collapse;
 }
 
-.reports tr {
-}
-
-.reports th {
-    text-align: left;
-}
-
-.reports tr.bug-row {
+.bug-row {
     cursor: pointer;
 }
 
-.reports tr.bug-row:hover {
-    background: #f0f0f0;
+.bug-row td {
+    border: 0;
 }
 
-.reports th, td {
+.bug-row:hover {
+    background: #ffffff;
+}
+
+.header {
+    text-align: left;
 }
 
 #errors {
@@ -237,25 +235,6 @@ div.more-link:hover {
     cursor: pointer;
 }
 
-div.indicator-panel {
-    margin-top: 10px;
-    display: table;
-    border-spacing: 10px;
-}
-
-div.indicator-row {
-    display: table-row;
-}
-
-div.indicator-box {
-    display: table-cell;
-    width: 90px;
-    height: 90px;
-    text-align: center;
-    border: 4px outset black;
-    vertical-align: middle;
-}
-
 div.indicatorLoading {
     background: #f0f0f0;
 }
@@ -349,7 +328,7 @@ div.listentrybutton {
     text-align: right;
 }
 
-div.nodisplay {
+.nodisplay {
     visibility: hidden;
 }
 
@@ -407,4 +386,27 @@ div.entitylist {
 button.adminbutton {
 	font-size: 6pt;
 	vertical-align: middle;
+}
+
+div.detailedreportbox {
+    display: table;
+}
+
+div.detailedreportrow {
+    display: table-row;
+}
+
+div.detailedreportfield {
+    display: table-cell;
+    border-left: 3px groove black;
+    padding-left: 10px;
+}
+
+div.detailedreportfield:first-child {
+    border: 0;
+    padding-left: 0;
+}
+
+td.reportcell {
+    width: 16.5%;
 }

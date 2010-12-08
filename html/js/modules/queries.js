@@ -36,6 +36,39 @@ Require.modules["queries"] = function(exports, require) {
     return args;
   }
 
+  function addProdCompQuery(args, prodcomps) {
+    var fullProducts = [];
+    var products = [];
+    var components = [];
+    var i;
+    for (i = 0; i < prodcomps.length; i++) {
+      if (!prodcomps[i][1]) {
+        fullProducts.push(prodcomps[i][0]);
+      }
+    }
+    for (i = 0; i < prodcomps.length; i++) {
+      if (fullProducts.indexOf(prodcomps[i][0]) != -1)
+        continue;
+      if (!(prodcomps[i][0] in products)) {
+        products.push(prodcomps[i][0]);
+      }        
+      if (prodcomps[i][1] && !(prodcomps[i][1] in components)) {
+        components.push(prodcomps[i][1]);
+      }
+    }
+    if (products.length || fullProducts.length) {
+      if (!("product" in args))
+        args["product"] = [];
+      args["product"] = args["product"].concat(fullProducts, products);
+    }
+    if (components.length) {
+      if (!("component" in args))
+        args["component"] = [];
+      args["component"] = args["component"].concat(components);
+    }
+    return args;
+  }
+
   function searchReviews(review_field, query_results, response) {
     for (b in response.bugs) {
       for (a in response.bugs[b].attachments) {
@@ -63,6 +96,7 @@ Require.modules["queries"] = function(exports, require) {
   exports.NEXT_INTERIM_RELEASE = "Beta7";
   exports.NEXT_PRODUCT_RELEASE = "2.0";
   var productRel = "20";
+  var nobody = "nobody@mozilla.org";
 
   exports.queries = {
     open_blockers: function() {
@@ -81,25 +115,6 @@ Require.modules["queries"] = function(exports, require) {
       }
     };
   },
-  /*
-    open_noms: function() {
-    return {
-      id: 'open_noms',
-      name: 'Blocker nominations',
-      requires_user: false,
-      threshold: [50, 25],
-      username_field: "assigned_to",
-      args: function(usernames) {
-        var a = {
-          resolution: '---',
-          field0_HYPH_0_HYPH_0: 'cf_blocking_' + productRel',
-          type0_HYPH_0_HYPH_0: 'equals',
-          value0_HYPH_0_HYPH_0: '?',
-        };
-        return addUserAssignedQuery(a, 1, usernames);
-      }
-    },
-  */
   regressions: function() {
     return {
       id: 'regressions',
@@ -254,6 +269,98 @@ Require.modules["queries"] = function(exports, require) {
         searchReviews("requestee", query_results, response);
       }
     };
+  },
+  
+  topcrash: function() {
+    return {
+      id: 'topcrash',
+      name: 'Top crashers',
+      to_do: true,
+      args: function(prodcomps) {
+        var a = {
+          field0_HYPH_0_HYPH_0: 'keywords',
+          type0_HYPH_0_HYPH_0: 'substring',
+          value0_HYPH_0_HYPH_0: 'topcrash'
+        };
+        addUserAssignedQuery(a, 1, [nobody]);
+        addProdCompQuery(a, prodcomps);
+        return a;
+      }
+    };
+  },
+  
+  open_noms: function() {
+    return {
+      id: 'open_noms',
+      name: 'Blocker nominations',
+      to_do: true,
+      username_field: "assigned_to",
+      args: function(prodcomps) {
+        var a = {
+          resolution: '---',
+          field0_HYPH_0_HYPH_0: 'cf_blocking_' + productRel,
+          type0_HYPH_0_HYPH_0: 'equals',
+          value0_HYPH_0_HYPH_0: '?'
+        };
+        addUserAssignedQuery(a, 1, [nobody]);
+        addProdCompQuery(a, prodcomps);
+        return a;
+      }
+    };
+  },
+
+  sg_crit: function() {
+    return {
+      id: 'sg_crit',
+      name: 'Critical security',
+      to_do: true,
+      args: function(prodcomps) {
+        var a = {
+          resolution: '---',
+          field0_HYPH_0_HYPH_0: 'status_whiteboard',
+          type0_HYPH_0_HYPH_0: 'allwordssubstr',
+          value0_HYPH_0_HYPH_0: '[sg:crit'
+        };
+        addUserAssignedQuery(a, 1, [nobody]);
+        addProdCompQuery(a, prodcomps);
+        return a;
+      }
+    };
+  },
+  
+  nobody: function() {
+    return {
+      id: 'nobody',
+      name: 'Nobody',
+      to_do: true,
+      args: function(prodcomps) {
+        var a = {
+          resolution: '---'
+        };
+        addUserAssignedQuery(a, 0, [nobody]);
+        addProdCompQuery(a, prodcomps);
+        return a;
+      }
+    };
+  },
+
+  changed_last_week: function() {
+    return {
+      id: "changed_last_week",
+      name: "Changed in the last week",
+      to_do: true,
+      args: function(prodcomps) {
+        var a = {
+          resolution: "---",
+          changed_after: "1w"
+        };
+        //addUserAssignedQuery(a, 0, [nobody]);
+        addProdCompQuery(a, prodcomps);
+        return a;
+      }
+    };
   }
+  
   };
+  
 };
