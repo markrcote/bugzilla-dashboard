@@ -62,12 +62,6 @@ a:hover {
     border-spacing: 10px;
 }
 
-.reports .container > div {
-    display: table-cell;
-    border: 4px black outset;
-    background: #f0f0f0;
-}
-
 .reportboxtable {
     display: table;
     border-spacing: 0;
@@ -75,13 +69,6 @@ a:hover {
 
 .reportdetails {
     display: table-cell;
-}
-
-.reports td {
-    display: table-cell;
-    border: 4px black outset;
-    background: #f0f0f0;
-
 }
 
 .reports .container h2 {
@@ -123,8 +110,8 @@ table, caption {
     border: 0;
 }
 
-.bug-row:hover {
-    background: #ffffff;
+tr.bug-row:hover {
+    background: white;
 }
 
 .header {
@@ -233,6 +220,10 @@ div.more-link:hover {
 
 .pagelink {
     cursor: pointer;
+}
+
+div.pagelink:hover, h3.pagelink:hover {
+    background: white;
 }
 
 div.indicatorLoading {
@@ -409,4 +400,11 @@ div.detailedreportfield:first-child {
 
 td.reportcell {
     width: 16.5%;
+    border: 4px black outset;
+    background: #f0f0f0;
+}
+
+td.detailedreportcell {
+    border: 4px black outset;
+    background: #f0f0f0;
 }
