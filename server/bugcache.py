@@ -21,10 +21,12 @@ class BugCache(object):
         #print 'url is %s' % url
         attempts = 0
         while attempts < 3:
-            json_data = urllib.urlopen(url).read()
-            tmp_json = json.loads(json_data)
-            if 'error' not in tmp_json or not tmp_json['error']:
-                break
+            u = urllib.urlopen(url)
+            json_data = u.read()
+            if u.getcode() == 200:
+                tmp_json = json.loads(json_data)
+                if 'error' not in tmp_json or not tmp_json['error']:
+                    break
             attempts += 1
         if attempts == 3:
             return ''
