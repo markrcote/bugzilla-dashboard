@@ -920,7 +920,8 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     this.getStat = function(forceUpdate, query, getStatCb) {
       this.results[query.id] = 0;
       
-      if (!query.to_do && this.usernames.length == 0) {
+      if ((query.to_do && this.prodcomps.length == 0) || 
+          (!query.to_do && this.usernames.length == 0)) {
         this.queryDone(query);
         return;
       }
