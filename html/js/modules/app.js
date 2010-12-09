@@ -1013,7 +1013,8 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
   }
   
   // FIXME: Should these be classic JS objects, or should they inherit another way?
-  function Report(id, name, detailed, topLevel) {
+  function Report(reportType, id, name, detailed, topLevel) {
+    this.reportType = reportType;
     this.id = id;
     this.name = name;
     this.detailed = detailed;
@@ -1087,7 +1088,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     
     this.queryDoneCb = function (query, results) {
       var total = results[query.id];
-      $("#" + this.cleanId(this.id + query.id)).find(".value").text(total);
+      $("#" + this.cleanId(this.reportType + this.id + query.id)).find(".value").text(total);
     };
     
     this.showBugs = function showBugs(bugs) {
@@ -1201,7 +1202,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         entry.click(function() { window.open(bugzilla.uiQueryUrl(translateTerms(query.args(self.prodcomps())))); });
       else
         entry.click(function() { window.open(bugzilla.uiQueryUrl(translateTerms(query.args(self.usernames())))); });
-      entry.attr("id", this.cleanId(this.id + query.id));
+      entry.attr("id", this.cleanId(this.reportType + this.id + query.id));
       entry.addClass("pagelink");
       entry.find(".name").text(stat.name);
       entry.find(".value").text("...");
@@ -1245,14 +1246,14 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
   }
   
   function TeamReport(teamId, team, detailed, topLevel, groupType) {
-    Report.call(this, teamId, team.name, detailed, topLevel);
-    this.team = team;
-    this.indicatorLoaders = [];
-    this.detailed = detailed;
     if (groupType)
       this.groupType = groupType;
     else
       this.groupType = "team";
+    Report.call(this, this.groupType, teamId, team.name, detailed, topLevel);
+    this.team = team;
+    this.indicatorLoaders = [];
+    this.detailed = detailed;
     
     this.usernames = function () {
       var i;
@@ -1328,7 +1329,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
   TeamReport.prototype = new Report;
 
   function UserReport(userId, user, detailed) {
-    Report.call(this, userId, user.nick ? user.nick : user.name, detailed, false);
+    Report.call(this, "user", userId, user.nick ? user.nick : user.name, detailed, false);
     this.user = user;
     
     this.usernames = function () {
