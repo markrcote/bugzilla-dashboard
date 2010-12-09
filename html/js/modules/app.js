@@ -1074,6 +1074,8 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         reportbox.find(".reportboxtable").append(this.details);
         this.toDo[0] = $("#templates .detailedreportfield").clone();
         this.toDo[0].find(".name").text("Stuff to do...");
+        this.toDo[0].find(".name").addClass("loading");
+        this.toDo[0].find(".stats").addClass("nodisplay");
         this.toDo[1] = $("#templates .detailedreportfield").clone();
         this.toDo[1].find(".name").text("Most Active Bugs");
         this.toDo[1].find(".name").addClass("loading");
@@ -1142,8 +1144,13 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     }
     
     this.mostActiveLoaded = function(most_active) {
-      this.toDo[1].append(this.showBugs(most_active.slice(0, 10)));
+      var table = this.showBugs(most_active.slice(0, 10));
+      table.addClass("nodisplay");
+      this.toDo[1].append(table);
       this.toDo[1].find(".name").removeClass("loading");
+      table.css('visibility','visible').hide().fadeIn('slow');
+      table.removeClass("nodisplay");
+      table.fadeIn();
     }
     
     this.allDoneCb = function() {
@@ -1159,7 +1166,15 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         require("app/ui/mostactive").get(function(bugs) { self.mostActiveLoaded(bugs); }, this.prodcomps());
       }
     };
-    
+
+    this.allDoneToDoCb = function() {
+      this.toDo[0].find(".name").removeClass("loading");
+      this.toDo[0].find(".stats").css('visibility','visible').hide().fadeIn('slow');
+
+      this.toDo[0].find(".stats").removeClass("nodisplay");
+      this.toDo[0].find(".stats").fadeIn();
+    };
+
     this.getIndent = function (indentLevel) {
       var indent = "";
       if (indentLevel) {
@@ -1214,6 +1229,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       var i;
       var self = this;
       var queries = [];
+      var toDoQueries = [];
       var previousWasGroup = false; 
       
       for (i = 0; i < this.displayedQueries.length; i++) {
@@ -1225,17 +1241,23 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         previousWasGroup = (this.displayedQueries[i].type == "group"); 
       }
       
-      if (this.detailed) {
-        for (i = 0; i < this.stuffToDoQueries.length; i++) {
-          this.displayEntry(this.toDo[0], queries, this.stuffToDoQueries[i], 0, true);
-        }
-      }
-      
       this.QueryRunner = new QueryRunner(
           forceUpdate, this.usernames(), this.prodcomps(),
           function(query) { },
           function(query, value) { self.queryDoneCb(query, value); },
           function() { self.allDoneCb(); }, queries);
+
+      if (this.detailed) {
+        for (i = 0; i < this.stuffToDoQueries.length; i++) {
+          this.displayEntry(this.toDo[0].find(".stats"), toDoQueries, this.stuffToDoQueries[i], 0, true);
+        }
+      }
+
+      this.toDoQueryRunner = new QueryRunner(
+          forceUpdate, this.usernames(), this.prodcomps(),
+          function(query) { },
+          function(query, value) { self.queryDoneCb(query, value); },
+          function() { self.allDoneToDoCb(); }, toDoQueries);
     };
   }
   
