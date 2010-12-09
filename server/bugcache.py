@@ -26,11 +26,9 @@ class BugCache(object):
             if u.getcode() == 200:
                 tmp_json = json.loads(json_data)
                 if 'error' not in tmp_json or not tmp_json['error']:
-                    break
+                    return json_data
             attempts += 1
-        if attempts == 3:
-            return ''
-        return json_data
+        return ''
     
     def get(self, search_string):
         cached = None

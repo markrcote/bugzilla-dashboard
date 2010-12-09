@@ -28,7 +28,6 @@ class bugcache_handler:
     def GET(self, name):
         query = name + web.ctx.query
         results = bc.get(query)
-        jsondata = json.dumps(results)
         web.header('Content-Length', len(results))
         web.header('Vary', 'Content-Type')
         web.header('Content-Type', 'application/json; charset=utf-8')
@@ -165,6 +164,7 @@ class login(JsonData):
         if 'error' in response:
             return self.do_json(response)
         return self.do_json({'error': 0})
+
 
 if __name__ == '__main__':
     app.run()

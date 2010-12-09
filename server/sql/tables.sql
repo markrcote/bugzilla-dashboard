@@ -1,40 +1,40 @@
 CREATE TABLE queries (
     id INT AUTO_INCREMENT,
-    PRIMARY KEY (id)
-    search TEXT,
-    results LONGTEXT,
+    PRIMARY KEY (id),
+    search TEXT COLLATE utf8_bin,
+    results LONGTEXT COLLATE utf8_bin,
     lastmod TIMESTAMP DEFAULT now()
 );
 
 CREATE TABLE divisions (
     id INT AUTO_INCREMENT,
-    PRIMARY KEY (id)
-    name TEXT
+    PRIMARY KEY (id),
+    name TEXT COLLATE utf8_bin
 );
 
 CREATE TABLE teams (
     id INT AUTO_INCREMENT,
-    PRIMARY KEY (id)
-	name TEXT,
-	division_id INT,
-	FOREIGN KEY (division_id) REFERENCES divisions(id)
+    PRIMARY KEY (id),
+    name TEXT COLLATE utf8_bin,
+    division_id INT,
+    FOREIGN KEY (division_id) REFERENCES divisions(id)
 );
 
 CREATE TABLE prodcomps (
     id INT AUTO_INCREMENT,
-    PRIMARY KEY (id)
-	product TEXT,
-	component TEXT,
-	team_id INT,
-	FOREIGN KEY (team_id) REFERENCES teams(id)
+    PRIMARY KEY (id),
+    product TEXT COLLATE utf8_bin,
+    component TEXT COLLATE utf8_bin,
+    team_id INT,
+    FOREIGN KEY (team_id) REFERENCES teams(id)
 );
 
 CREATE TABLE members (
     id INT AUTO_INCREMENT,
-    PRIMARY KEY (id)
-	name TEXT,
-	bugemail TEXT,
-	nick TEXT,
-	team_id INT,
-	FOREIGN KEY (team_id) REFERENCES teams(id)
+    PRIMARY KEY (id),
+    name TEXT COLLATE utf8_bin,
+    bugemail TEXT COLLATE utf8_bin,
+    nick TEXT COLLATE utf8_bin,
+    team_id INT,
+    FOREIGN KEY (team_id) REFERENCES teams(id)
 );

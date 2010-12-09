@@ -536,7 +536,6 @@ Require.modules["app/ui/admin"] = function(exports, require) {
   var currentDivisionId = -1;
   var currentTeamId = -1;
 
-
   function selectionChangedFunc(divId, teamId) {
     if (teamId === undefined)
       teamId = -1;
