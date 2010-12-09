@@ -1141,7 +1141,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     }
     
     this.mostActiveLoaded = function(most_active) {
-      this.toDo[1].append(this.showBugs(most_active.slice(0, 9)));
+      this.toDo[1].append(this.showBugs(most_active.slice(0, 10)));
       this.toDo[1].find(".name").removeClass("loading");
     }
     
