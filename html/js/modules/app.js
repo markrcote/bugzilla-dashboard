@@ -1459,7 +1459,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       if (!division) {
         return;  // FIXME: proper error
       }
-      var report = new TeamReport(who.division, division, true, "division");
+      var report = new TeamReport(who.division, division, true, false, "division");
       teamReports.push(report);
       report.update(detailedReportContainer, forceUpdate);
       if ("teams" in division) {
@@ -1483,7 +1483,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       if (!team) {
         return;  // FIXME: proper error
       }
-      var report = new TeamReport(who.team, team, true);
+      var report = new TeamReport(who.team, team, true, false);
       var teamCount = 0;
       teamReports.push(report);
       report.update(detailedReportContainer, forceUpdate);
