@@ -869,7 +869,7 @@ Require.modules["app/ui/mostactive"] = function(exports, require) {
     callback = cb;
     afterdate = require("date-utils").timeAgo(MS_PER_DAY * 7);
     var query = require("queries").queries["changed_last_week"]();
-    var args = query.args(prodcomps);
+    var args = query.args_unassigned(prodcomps);
     args["include_fields"] = "id,summary,comments,history,status,priority,severity,last_change_time";
     var newTerms = translateTerms(args);
     
@@ -892,18 +892,17 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
   var startTime;
 
   // FIXME: Should probably be a separate (sub)module.
-  function QueryRunner(forceUpdate, usernames, prodcomps, queryInitCb, queryDoneCb, allDoneCb, queries) {
+  function QueryRunner(forceUpdate, usernames, prodcomps, queryDoneCb, allDoneCb, queries, queryType) {
     // FIXME: Could probably split this into another object per query.
     this.usernames = usernames.slice(0);
     this.prodcomps = prodcomps.slice(0);
-    this.queryInitCb = queryInitCb;
     this.queryDoneCb = queryDoneCb;
     this.allDoneCb = allDoneCb;
     this.queryCount = 0;
     this.results = {};
     
     this.queryDone = function(query) {
-      this.queryDoneCb(query, this.results);
+      this.queryDoneCb(query, queryType, this.results);
       this.decQueryCount();
     }
     
@@ -919,16 +918,13 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     this.getStat = function(forceUpdate, query, getStatCb) {
       this.results[query.id] = 0;
       
-      if ((query.to_do && this.prodcomps.length == 0) || 
-          (!query.to_do && this.usernames.length == 0)) {
+      if ((queryType == "unassigned" && this.prodcomps.length == 0) || 
+          (queryType == "assigned" && this.usernames.length == 0)) {
         this.queryDone(query);
         return;
       }
 
-      if (query.to_do)
-        var args = query.args(this.prodcomps);
-      else
-        var args = query.args(this.usernames);
+      var args = query["args_" + queryType](queryType == "assigned" ? this.usernames : this.prodcomps);
       var newTerms = translateTerms(args);
       
       var self = this;
@@ -955,60 +951,11 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     this.queryCount = queries.length;
     var self = this;
     for (q in queries) {
-      this.queryInitCb(queries[q]);
       this.getStat(forceUpdate, queries[q],
           function(query, value) {
             self.queryDone(query, value);
           }
         );
-    }
-  }
-  
-  // FIXME: Move threshold-colourizer stuff out and into Report classes.
-  function IndicatorLoader(userIds, indicatorBox) {
-    this.indicatorBox = indicatorBox;
-    this.userIds = userIds.slice(0);
-    this.warn = false;
-    this.err = false;
-    this.stats = {};
-    
-    this.queryInitCb = function (usernames, query) {
-      this.stats[query.id] = $("#templates .indicator-stat").clone();
-      this.stats[query.id].find(".name").text(query.short_form);
-      this.stats[query.id].find(".value").text("...");
-      this.indicatorBox.append(this.stats[query.id]);
-    }
-    
-    this.queryDoneCb = function(usernames, query, results) {
-      var total = results[query.id];
-      this.stats[query.id].find(".value").text(total);
-      if ("threshold" in query) {
-        if (total > query.threshold[0] * this.userIds.length)
-          this.err = true;
-        else if (total > query.threshold[1] * this.userIds.length)
-          this.warn = true;
-      }
-      this.setColour();
-    }
-    
-    this.setColour = function() {
-      var newClass = "";
-      if (this.err)
-        newClass = "indicatorErr";
-      else if (this.warn)
-        newClass = "indicatorWarn";
-      else
-        newClass = "indicatorOk";
-      if (!this.indicatorBox.hasClass(newClass))
-        this.indicatorBox.removeClass("indicatorLoading indicatorOk indicatorWarn indicatorErr").addClass(newClass);
-    }
-    
-    this.go = function(forceUpdate) {
-      var self = this;
-      this.queryRunner = new QueryRunner(forceUpdate, this.userIds,
-          function(usernames, query) { return self.queryInitCb(usernames, query); },
-          function(usernames, query, value) { self.queryDoneCb(usernames, query, value); },
-          function() { });
     }
   }
   
@@ -1043,10 +990,13 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     ];
     
     this.stuffToDoQueries = [
-      { type: "stat", name: "Top Crashers", query: "topcrash" },
-      { type: "stat", name: "Blocker Noms", query: "open_noms" },
-      { type: "stat", name: "Critical Security", query: "sg_crit" },
-      { type: "stat", name: "Assigned to Nobody", query: "nobody" }
+      { type: "group", name: "Unassigned Bugs", members: [ 
+        { type: "stat", name: "Critical Security", query: "sg_crit" },
+        { type: "stat", name: "Top Crashers", query: "topcrash" },
+        { type: "stat", name: "Regressions", query: "regressions" },
+        { type: "stat", name: "Blocker Noms", query: "open_noms" },
+        { type: "stat", name: "Assigned to Nobody", query: "nobody" } ]
+      }
     ];
     
     this.setupReportDisplay = function (selector) {
@@ -1096,9 +1046,9 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       return id.replace(/@/g, "").replace(/\./g, "").replace(/_/g, "").replace(/\//g, "");
     };
     
-    this.queryDoneCb = function (query, results) {
+    this.queryDoneCb = function (query, queryType, results) {
       var total = results[query.id];
-      $("#" + this.cleanId(this.reportType + this.id + query.id)).find(".value").text(total);
+      $("#" + this.cleanId(this.reportType + this.id + queryType + query.id)).find(".value").text(total);
     };
     
     this.showBugs = function showBugs(bugs) {
@@ -1192,14 +1142,14 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       return indent;
     };
     
-    this.displayEntry = function(selector, queries, entry, indentLevel, toDoQuery) {
+    this.displayEntry = function(selector, queries, entry, indentLevel, queryType) {
       switch (entry.type) {
-        case "group": this.displayGroup(selector, queries, entry, indentLevel); break;
-        case "stat": this.displayStat(selector, queries, entry, indentLevel, toDoQuery); break;
+        case "group": this.displayGroup(selector, queries, entry, indentLevel, queryType); break;
+        case "stat": this.displayStat(selector, queries, entry, indentLevel, queryType); break;
       }
     };
     
-    this.displayGroup = function (selector, queries, group, indentLevel) {
+    this.displayGroup = function (selector, queries, group, indentLevel, queryType) {
       if (indentLevel === undefined)
         indentLevel = 0;
       var indent = this.getIndent(indentLevel);
@@ -1209,23 +1159,21 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       selector.append(entry);
       
       for (m in group.members)
-        this.displayEntry(selector, queries, group.members[m], indentLevel+1);
+        this.displayEntry(selector, queries, group.members[m], indentLevel+1, queryType);
     };
     
-    this.displayStat = function (selector, queries, stat, indentLevel) {
-      if (indentLevel === undefined)
-        indentLevel = 0;
+    this.displayStat = function (selector, queries, stat, indentLevel, queryType) {
       var self = this;
       var indent = this.getIndent(indentLevel);
       var entry = $("#templates .statsentry").clone();
       var query = require("queries").queries[stat.query]();
       queries.push(query);
       entry.find(".indent").html(indent);
-      if (query.to_do)
-        entry.click(function() { window.open(bugzilla.uiQueryUrl(translateTerms(query.args(self.prodcomps())))); });
+      if (queryType == "unassigned")
+        entry.click(function() { window.open(bugzilla.uiQueryUrl(translateTerms(query.args_unassigned(self.prodcomps())))); });
       else
-        entry.click(function() { window.open(bugzilla.uiQueryUrl(translateTerms(query.args(self.usernames())))); });
-      entry.attr("id", this.cleanId(this.reportType + this.id + query.id));
+        entry.click(function() { window.open(bugzilla.uiQueryUrl(translateTerms(query.args_assigned(self.usernames())))); });
+      entry.attr("id", this.cleanId(this.reportType + this.id + queryType + query.id));
       entry.addClass("pagelink");
       entry.find(".name").text(stat.name);
       entry.find(".value").text("...");
@@ -1245,27 +1193,25 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
           var sep = $("#templates .statsgroupsep").clone();
           this.stats.append(sep);
         }
-        this.displayEntry(this.stats, queries, this.displayedQueries[i], 0, false);
+        this.displayEntry(this.stats, queries, this.displayedQueries[i], 0, "assigned");
         previousWasGroup = (this.displayedQueries[i].type == "group"); 
       }
       
       this.QueryRunner = new QueryRunner(
           forceUpdate, this.usernames(), this.prodcomps(),
-          function(query) { },
-          function(query, value) { self.queryDoneCb(query, value); },
-          function() { self.allDoneCb(); }, queries);
+          function(query, queryType, value) { self.queryDoneCb(query, queryType, value); },
+          function() { self.allDoneCb(); }, queries, "assigned");
 
       if (this.detailed) {
         for (i = 0; i < this.stuffToDoQueries.length; i++) {
-          this.displayEntry(this.toDo[0].find(".stats"), toDoQueries, this.stuffToDoQueries[i], 0, true);
+          this.displayEntry(this.toDo[0].find(".stats"), toDoQueries, this.stuffToDoQueries[i], 0, "unassigned");
         }
       }
 
       this.toDoQueryRunner = new QueryRunner(
           forceUpdate, this.usernames(), this.prodcomps(),
-          function(query) { },
-          function(query, value) { self.queryDoneCb(query, value); },
-          function() { self.allDoneToDoCb(); }, toDoQueries);
+          function(query, queryType, value) { self.queryDoneCb(query, queryType, value); },
+          function() { self.allDoneToDoCb(); }, toDoQueries, "unassigned");
     };
   }
   

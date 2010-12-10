@@ -109,69 +109,75 @@ Require.modules["queries"] = function(exports, require) {
   
   exports.queries = {
     open_blockers: function() {
-    return {
-      id: 'open_blockers',
-      name: 'Open blockers',
-      short_form: "+'s",
-      requires_user: false,
-      username_field: "assigned_to",
-      args: function(usernames) {
+      function args() {
         var a = {
           resolution: '---'
         };
-        a = addBlockerQuery(a, 0);
-        return addUserAssignedQuery(a, 1, usernames);
+        return addBlockerQuery(a, 0);
       }
-    };
-  },
-  regressions: function() {
-    return {
-      id: 'regressions',
-      name: 'Open regression blockers',
-      short_form: "Reg",
-      requires_user: false,
-      username_field: "assigned_to",
-      args: function(usernames) {
+
+      return {
+        id: 'open_blockers',
+        name: 'Open blockers',
+        short_form: "+'s",
+        requires_user: false,
+        args_assigned: function(usernames) {
+          return addUserAssignedQuery(args(), 1, usernames);
+        }
+      };
+    },
+  
+    regressions: function() {
+      function args() {
         var a = {
           resolution: '---',
           field0_HYPH_0_HYPH_0: 'keywords',
           type0_HYPH_0_HYPH_0: 'substring',
           value0_HYPH_0_HYPH_0: 'regression'
         };
-        a = addBlockerQuery(a, 1);
-        return addUserAssignedQuery(a, 2, usernames);
+        addBlockerQuery(a, 1);
+        return a;
       }
-    };
-  },
-
-  crashers: function() {
-    return {
-      id: 'crashers',
-      name: 'Crasher blockers',
-      short_form: "Crash",
-      requires_user: false,
-      username_field: "assigned_to",
-      args: function(usernames) {
+      
+      return {
+        id: 'regressions',
+        name: 'Open regression blockers',
+        short_form: "Reg",
+        requires_user: false,
+        args_assigned: function(usernames) {
+          return addUserAssignedQuery(args(), 2, usernames);
+        },
+        args_unassigned: function(prodcomps) {
+          var a = addUserAssignedQuery(args(), 2, nobody(prodcomps));
+          return addProdCompQuery(a, prodcomps);
+        }
+      };
+    },
+  
+    crashers: function() {
+      function args() {
         var a = {
           resolution: '---',
           field0_HYPH_0_HYPH_0: 'keywords',
           type0_HYPH_0_HYPH_0: 'anywords',
           value0_HYPH_0_HYPH_0: 'crash topcrash'
         };
-        a = addBlockerQuery(a, 1);
-        return addUserAssignedQuery(a, 2, usernames);
+        return addBlockerQuery(a, 1);
       }
-    };
-  },
 
-  security: function() {
-    return {
-      id: 'security',
-      name: 'Security blockers',
-      short_form: "sg",
-      requires_user: false,
-      username_field: "assigned_to",
-      args: function(usernames) {
+      return {
+        id: 'crashers',
+        name: 'Crasher blockers',
+        short_form: "Crash",
+        requires_user: false,
+        args_assigned: function(usernames) {
+          return addUserAssignedQuery(args(), 2, usernames);
+        }
+      };
+    },
+  
+    security: function() {
+      function args() {
         var a = {
           resolution: '---',
           field0_HYPH_0_HYPH_0: 'component',
@@ -179,22 +185,24 @@ Require.modules["queries"] = function(exports, require) {
           value0_HYPH_0_HYPH_0: 'Security',
           field0_HYPH_0_HYPH_1: 'status_whiteboard',
           type0_HYPH_0_HYPH_1: 'allwordssubstr',
-          value0_HYPH_0_HYPH_1: '[sg:',
+          value0_HYPH_0_HYPH_1: '[sg:'
         };
-        a = addBlockerQuery(a, 1);
-        return addUserAssignedQuery(a, 2, usernames);
+        return addBlockerQuery(a, 1);
       }
-    };
-  },
-
-  blockers_fixed_30_days: function() {
-    return {
-      id: 'blockers_fixed_30_days',
-      name: 'Blockers fixed in the last 30 days',
-      short_form: "+'s -30d",
-      requires_user: false,
-      username_field: "assigned_to",
-      args: function(usernames) {
+          
+      return {
+        id: 'security',
+        name: 'Security blockers',
+        short_form: "sg",
+        requires_user: false,
+        args_assigned: function(usernames) {
+          return addUserAssignedQuery(args(), 2, usernames);
+        }
+      };
+    },
+  
+    blockers_fixed_30_days: function() {
+      function args(usernames) {
         var a = {
           resolution: 'FIXED',
           changed_field: 'resolution',
@@ -202,20 +210,22 @@ Require.modules["queries"] = function(exports, require) {
           changed_before: 'Now',
           changed_after: require("date-utils").timeAgo(MS_PER_DAY * 30)
         };
-        a = addBlockerQuery(a, 0);
-        return addUserAssignedQuery(a, 1, usernames);
+        return addBlockerQuery(a, 0);
       }
-    };
-  },
 
-  nonblockers_fixed_30_days: function() {
-    return {
-      id: 'nonblockers_fixed_30_days',
-      name: 'Nonblockers fixed in the last 30 days',
-      short_form: "Non-+ -30d",
-      requires_user: false,
-      username_field: "assigned_to",
-      args: function(usernames) {
+      return {
+        id: 'blockers_fixed_30_days',
+        name: 'Blockers fixed in the last 30 days',
+        short_form: "+'s -30d",
+        requires_user: false,
+        args_assigned: function(usernames) {
+          return addUserAssignedQuery(args(), 1, usernames);
+        }
+      };
+    },
+  
+    nonblockers_fixed_30_days: function() {
+      function args() {
         var a = {
           resolution: 'FIXED',
           changed_field: 'resolution',
@@ -229,20 +239,22 @@ Require.modules["queries"] = function(exports, require) {
           type0_HYPH_1_HYPH_0: 'notsubstring',
           value0_HYPH_1_HYPH_0: 'beta'
         };
-        return addUserAssignedQuery(a, 2, usernames);
+        return a;
       }
-    };
-  },
 
-  nonblocker_patches_awaiting_review: function() {
-    return {
-      id: 'nonblocker_patches_awaiting_review',
-      name: 'NonBlocker Patches awaiting review',
-      short_form: "P",
-      requires_user: true,
-      include_fields: "attachments",
-      //priority: 1,
-      args: function(usernames) {
+      return {
+        id: 'nonblockers_fixed_30_days',
+        name: 'Nonblockers fixed in the last 30 days',
+        short_form: "Non-+ -30d",
+        requires_user: false,
+        args_assigned: function(usernames) {
+          return addUserAssignedQuery(args(), 2, usernames);
+        }
+      };
+    },
+  
+    nonblocker_patches_awaiting_review: function() {
+      function args() {
         // username is mandatory
         var a = {
           resolution: "---",
@@ -250,173 +262,200 @@ Require.modules["queries"] = function(exports, require) {
           field0_HYPH_0_HYPH_0: "flagtypes.name",
           value0_HYPH_0_HYPH_0: "review?"
         };
-        return addUserQuery("setters.login_name", "substring", a, 1, usernames);
-      },
-      get_values: function(query_results, response) {
-        searchReviews("setter", query_results, response);
+        return a;
       }
-    };
-  },
 
-  blocker_patches_awaiting_review: function() {
-    return {
-      id: 'blocker_patches_awaiting_review',
-      name: 'Blocker Patches awaiting review',
-      short_form: "P",
-      requires_user: true,
-      include_fields: "attachments",
-      //priority: 1,
-      args: function(usernames) {
-        // username is mandatory
+      return {
+        id: 'nonblocker_patches_awaiting_review',
+        name: 'NonBlocker Patches awaiting review',
+        short_form: "P",
+        requires_user: true,
+        args_assigned: function(usernames) {
+          return addUserQuery("setters.login_name", "substring", args(), 1, usernames);
+        },
+        get_values: function(query_results, response) {
+          searchReviews("setter", query_results, response);
+        }
+      };
+    },
+  
+    blocker_patches_awaiting_review: function() {
+      function args() {
         var a = {
           resolution: "---",
           type0_HYPH_0_HYPH_0: "substring",
           field0_HYPH_0_HYPH_0: "flagtypes.name",
           value0_HYPH_0_HYPH_0: "review?"
         };
-        addBlockerQuery(a, 1);
-        return addUserQuery("setters.login_name", "substring", a, 2, usernames);
-      },
-      get_values: function(query_results, response) {
-        searchReviews("setter", query_results, response);
+        return addBlockerQuery(a, 1);
       }
-    };
-  },
-
-  nonblocker_review_queue: function() {
-    return {
-      id: 'nonblocker_review_queue',
-      name: 'NonBlocker Review Queue',
-      short_form: "RQ",
-      requires_user: true,
-      threshold: [15, 8],
-      include_fields: "attachments",
-      //priority: 0,
-      args: function(usernames) {
+      
+      return {
+        id: 'blocker_patches_awaiting_review',
+        name: 'Blocker Patches awaiting review',
+        short_form: "P",
+        requires_user: true,
+        include_fields: "attachments",
+        args_assigned: function(usernames) {
+          // username is mandatory
+          return addUserQuery("setters.login_name", "substring", args(), 2, usernames);
+        },
+        get_values: function(query_results, response) {
+          searchReviews("setter", query_results, response);
+        }
+      };
+    },
+  
+    nonblocker_review_queue: function() {
+      function args() {
         var a = {
           resolution: "---"
         };
-        // REST API is flag.requestee
-        return addUserQuery("requestees.login_name", "equals", a, 0, usernames);
-      },
-      get_values: function(query_results, response) {
-        searchReviews("requestee", query_results, response);
+        return a;
       }
-    };
-  },
-
-  blocker_review_queue: function() {
-    return {
-      id: 'blocker_review_queue',
-      name: 'Blocker Review Queue',
-      short_form: "RQ",
-      requires_user: true,
-      threshold: [15, 8],
-      include_fields: "attachments",
-      //priority: 0,
-      args: function(usernames) {
+      
+      return {
+        id: 'nonblocker_review_queue',
+        name: 'NonBlocker Review Queue',
+        short_form: "RQ",
+        requires_user: true,
+        threshold: [15, 8],
+        include_fields: "attachments",
+        args_assigned: function(usernames) {
+          // REST API is flag.requestee
+          return addUserQuery("requestees.login_name", "equals", args(), 0, usernames);
+        },
+        get_values: function(query_results, response) {
+          searchReviews("requestee", query_results, response);
+        }
+      };
+    },
+  
+    blocker_review_queue: function() {
+      function args() {
         var a = {
           resolution: "---"
         };
-        // REST API is flag.requestee
-        addBlockerQuery(a, 0);
-        return addUserQuery("requestees.login_name", "equals", a, 1, usernames);
-      },
-      get_values: function(query_results, response) {
-        searchReviews("requestee", query_results, response);
+        return addBlockerQuery(a, 0);
       }
-    };
-  },
-
-  topcrash: function() {
-    return {
-      id: 'topcrash',
-      name: 'Top crashers',
-      to_do: true,
-      args: function(prodcomps) {
+      
+      return {
+        id: 'blocker_review_queue',
+        name: 'Blocker Review Queue',
+        short_form: "RQ",
+        requires_user: true,
+        threshold: [15, 8],
+        include_fields: "attachments",
+        args_assigned: function(usernames) {
+          // REST API is flag.requestee
+          var a = addBlockerQuery(args(), 0);
+          return addUserQuery("requestees.login_name", "equals", a, 1, usernames);
+        },
+        get_values: function(query_results, response) {
+          searchReviews("requestee", query_results, response);
+        }
+      };
+    },
+  
+    topcrash: function() {
+      function args() {
         var a = {
           field0_HYPH_0_HYPH_0: 'keywords',
           type0_HYPH_0_HYPH_0: 'substring',
           value0_HYPH_0_HYPH_0: 'topcrash'
         };
-        addUserAssignedQuery(a, 1, nobody(prodcomps));
-        addProdCompQuery(a, prodcomps);
         return a;
       }
-    };
-  },
-  
-  open_noms: function() {
-    return {
-      id: 'open_noms',
-      name: 'Blocker nominations',
-      to_do: true,
-      username_field: "assigned_to",
-      args: function(prodcomps) {
-        var a = {
-          resolution: '---',
-          field0_HYPH_0_HYPH_0: 'cf_blocking_' + productRel,
-          type0_HYPH_0_HYPH_0: 'equals',
-          value0_HYPH_0_HYPH_0: '?'
-        };
-        addUserAssignedQuery(a, 1, nobody(prodcomps));
-        addProdCompQuery(a, prodcomps);
-        return a;
-      }
-    };
-  },
 
-  sg_crit: function() {
-    return {
-      id: 'sg_crit',
-      name: 'Critical security',
-      to_do: true,
-      args: function(prodcomps) {
+      return {
+        id: 'topcrash',
+        name: 'Top crashers',
+        args_unassigned: function(prodcomps) {
+          var a = addUserAssignedQuery(args(), 1, nobody(prodcomps));
+          return addProdCompQuery(a, prodcomps);
+        }
+      };
+    },
+    
+    open_noms: function() {
+      function args() {
+        var a = {
+            resolution: '---',
+            field0_HYPH_0_HYPH_0: 'cf_blocking_' + productRel,
+            type0_HYPH_0_HYPH_0: 'equals',
+            value0_HYPH_0_HYPH_0: '?'
+        };
+        return a;
+      }
+      
+      return {
+        id: 'open_noms',
+        name: 'Blocker nominations',
+        args_unassigned: function(prodcomps) {
+          var a = addUserAssignedQuery(args(), 1, nobody(prodcomps));
+          return addProdCompQuery(a, prodcomps);
+        }
+      };
+    },
+  
+    sg_crit: function() {
+      function args() {
         var a = {
           resolution: '---',
           field0_HYPH_0_HYPH_0: 'status_whiteboard',
           type0_HYPH_0_HYPH_0: 'allwordssubstr',
           value0_HYPH_0_HYPH_0: '[sg:crit'
         };
-        addUserAssignedQuery(a, 1, nobody(prodcomps));
-        addProdCompQuery(a, prodcomps);
         return a;
       }
-    };
-  },
-  
-  nobody: function() {
-    return {
-      id: 'nobody',
-      name: 'Nobody',
-      to_do: true,
-      args: function(prodcomps) {
+
+      return {
+        id: 'sg_crit',
+        name: 'Critical security',
+        args_unassigned: function(prodcomps) {
+          var a = addUserAssignedQuery(args(), 1, nobody(prodcomps));
+          return addProdCompQuery(a, prodcomps);
+        }
+      };
+    },
+    
+    nobody: function() {
+      function args() {
         var a = {
           resolution: '---'
         };
-        addUserAssignedQuery(a, 0, nobody(prodcomps));
-        addProdCompQuery(a, prodcomps);
         return a;
       }
-    };
-  },
-
-  changed_last_week: function() {
-    return {
-      id: "changed_last_week",
-      name: "Changed in the last week",
-      to_do: true,
-      args: function(prodcomps) {
+      
+      return {
+        id: 'nobody',
+        name: 'Nobody',
+        args_unassigned: function(prodcomps) {
+          var a = addUserAssignedQuery(args(), 0, nobody(prodcomps));
+          return addProdCompQuery(a, prodcomps);
+        }
+      };
+    },
+  
+    changed_last_week: function() {
+      function args() {
         var a = {
           resolution: "---",
           changed_after: "1w"
         };
-        //addUserAssignedQuery(a, 0, nobody(prodcomps));
-        addProdCompQuery(a, prodcomps);
         return a;
       }
-    };
-  }
+      
+      return {
+        id: "changed_last_week",
+        name: "Changed in the last week",
+        args_unassigned: function(prodcomps) {
+          var a = addProdCompQuery(args(), prodcomps);  
+          //addUserAssignedQuery(a, 0, nobody(prodcomps));
+          return a;
+        }
+      };
+    }
   
   };
   
