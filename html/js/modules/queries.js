@@ -96,8 +96,17 @@ Require.modules["queries"] = function(exports, require) {
   exports.NEXT_INTERIM_RELEASE = "Beta7";
   exports.NEXT_PRODUCT_RELEASE = "2.0";
   var productRel = "20";
-  var nobody = "nobody@mozilla.org";
 
+  function nobody(prodcomps) {
+    var js = /^JavaScript/; 
+    var i;
+    for (i = 0; i < prodcomps.length; i++) {
+      if (prodcomps[i][1].match(js))
+        return ["nobody@mozilla.org", "general@js.bugs"];
+    }
+    return ["nobody@mozilla.org"];
+  }
+  
   exports.queries = {
     open_blockers: function() {
     return {
@@ -282,7 +291,7 @@ Require.modules["queries"] = function(exports, require) {
           type0_HYPH_0_HYPH_0: 'substring',
           value0_HYPH_0_HYPH_0: 'topcrash'
         };
-        addUserAssignedQuery(a, 1, [nobody]);
+        addUserAssignedQuery(a, 1, nobody(prodcomps));
         addProdCompQuery(a, prodcomps);
         return a;
       }
@@ -302,7 +311,7 @@ Require.modules["queries"] = function(exports, require) {
           type0_HYPH_0_HYPH_0: 'equals',
           value0_HYPH_0_HYPH_0: '?'
         };
-        addUserAssignedQuery(a, 1, [nobody]);
+        addUserAssignedQuery(a, 1, nobody(prodcomps));
         addProdCompQuery(a, prodcomps);
         return a;
       }
@@ -321,7 +330,7 @@ Require.modules["queries"] = function(exports, require) {
           type0_HYPH_0_HYPH_0: 'allwordssubstr',
           value0_HYPH_0_HYPH_0: '[sg:crit'
         };
-        addUserAssignedQuery(a, 1, [nobody]);
+        addUserAssignedQuery(a, 1, nobody(prodcomps));
         addProdCompQuery(a, prodcomps);
         return a;
       }
@@ -337,7 +346,7 @@ Require.modules["queries"] = function(exports, require) {
         var a = {
           resolution: '---'
         };
-        addUserAssignedQuery(a, 0, [nobody]);
+        addUserAssignedQuery(a, 0, nobody(prodcomps));
         addProdCompQuery(a, prodcomps);
         return a;
       }
@@ -354,7 +363,7 @@ Require.modules["queries"] = function(exports, require) {
           resolution: "---",
           changed_after: "1w"
         };
-        //addUserAssignedQuery(a, 0, [nobody]);
+        //addUserAssignedQuery(a, 0, nobody(prodcomps));
         addProdCompQuery(a, prodcomps);
         return a;
       }
