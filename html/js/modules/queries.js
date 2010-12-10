@@ -120,7 +120,6 @@ Require.modules["queries"] = function(exports, require) {
         id: 'open_blockers',
         name: 'Open blockers',
         short_form: "+'s",
-        requires_user: false,
         args_assigned: function(usernames) {
           return addUserAssignedQuery(args(), 1, usernames);
         }
@@ -143,7 +142,6 @@ Require.modules["queries"] = function(exports, require) {
         id: 'regressions',
         name: 'Open regression blockers',
         short_form: "Reg",
-        requires_user: false,
         args_assigned: function(usernames) {
           return addUserAssignedQuery(args(), 2, usernames);
         },
@@ -169,7 +167,6 @@ Require.modules["queries"] = function(exports, require) {
         id: 'crashers',
         name: 'Crasher blockers',
         short_form: "Crash",
-        requires_user: false,
         args_assigned: function(usernames) {
           return addUserAssignedQuery(args(), 2, usernames);
         }
@@ -194,7 +191,6 @@ Require.modules["queries"] = function(exports, require) {
         id: 'security',
         name: 'Security blockers',
         short_form: "sg",
-        requires_user: false,
         args_assigned: function(usernames) {
           return addUserAssignedQuery(args(), 2, usernames);
         }
@@ -217,7 +213,6 @@ Require.modules["queries"] = function(exports, require) {
         id: 'blockers_fixed_30_days',
         name: 'Blockers fixed in the last 30 days',
         short_form: "+'s -30d",
-        requires_user: false,
         args_assigned: function(usernames) {
           return addUserAssignedQuery(args(), 1, usernames);
         }
@@ -246,7 +241,6 @@ Require.modules["queries"] = function(exports, require) {
         id: 'nonblockers_fixed_30_days',
         name: 'Nonblockers fixed in the last 30 days',
         short_form: "Non-+ -30d",
-        requires_user: false,
         args_assigned: function(usernames) {
           return addUserAssignedQuery(args(), 2, usernames);
         }
@@ -269,8 +263,9 @@ Require.modules["queries"] = function(exports, require) {
         id: 'nonblocker_patches_awaiting_review',
         name: 'NonBlocker Patches awaiting review',
         short_form: "P",
-        requires_user: true,
         args_assigned: function(usernames) {
+          if (usernames.length == 0)
+            return null;
           return addUserQuery("setters.login_name", "substring", args(), 1, usernames);
         },
         get_values: function(query_results, response) {
@@ -294,10 +289,9 @@ Require.modules["queries"] = function(exports, require) {
         id: 'blocker_patches_awaiting_review',
         name: 'Blocker Patches awaiting review',
         short_form: "P",
-        requires_user: true,
-        include_fields: "attachments",
         args_assigned: function(usernames) {
-          // username is mandatory
+          if (usernames.length == 0)
+            return null;
           return addUserQuery("setters.login_name", "substring", args(), 2, usernames);
         },
         get_values: function(query_results, response) {
@@ -318,10 +312,10 @@ Require.modules["queries"] = function(exports, require) {
         id: 'nonblocker_review_queue',
         name: 'NonBlocker Review Queue',
         short_form: "RQ",
-        requires_user: true,
         threshold: [15, 8],
-        include_fields: "attachments",
         args_assigned: function(usernames) {
+          if (usernames.length == 0)
+            return null;
           // REST API is flag.requestee
           return addUserQuery("requestees.login_name", "equals", args(), 0, usernames);
         },
@@ -343,10 +337,10 @@ Require.modules["queries"] = function(exports, require) {
         id: 'blocker_review_queue',
         name: 'Blocker Review Queue',
         short_form: "RQ",
-        requires_user: true,
         threshold: [15, 8],
-        include_fields: "attachments",
         args_assigned: function(usernames) {
+          if (usernames.length == 0)
+            return null;
           // REST API is flag.requestee
           var a = addBlockerQuery(args(), 0);
           return addUserQuery("requestees.login_name", "equals", a, 1, usernames);

@@ -891,11 +891,13 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
   
   var startTime;
 
-  // FIXME: Should probably be a separate (sub)module.
-  function QueryRunner(forceUpdate, usernames, prodcomps, queryDoneCb, allDoneCb, queries, queryType) {
+  /**
+   * QueryRunner: runs a number of queries with arguments.
+   * Calls queryDoneCb() after each query finishes, and allDoneCb() after all finish.
+   */
+  function QueryRunner(forceUpdate, queryArgs, queryDoneCb, allDoneCb, queries, queryType) {
     // FIXME: Could probably split this into another object per query.
-    this.usernames = usernames.slice(0);
-    this.prodcomps = prodcomps.slice(0);
+    this.queryArgs = queryArgs;
     this.queryDoneCb = queryDoneCb;
     this.allDoneCb = allDoneCb;
     this.queryCount = 0;
@@ -918,13 +920,17 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     this.getStat = function(forceUpdate, query, getStatCb) {
       this.results[query.id] = 0;
       
-      if ((queryType == "unassigned" && this.prodcomps.length == 0) || 
-          (queryType == "assigned" && this.usernames.length == 0)) {
+      if (this.queryArgs.length == 0) {
         this.queryDone(query);
         return;
       }
 
-      var args = query["args_" + queryType](queryType == "assigned" ? this.usernames : this.prodcomps);
+      var args = query["args_" + queryType](this.queryArgs);
+      if (args === null) {
+        this.results[query.id] = "err";
+        this.queryDone(query); 
+        return;
+      }
       var newTerms = translateTerms(args);
       
       var self = this;
@@ -943,8 +949,6 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       queries = [];
       for (q in require("queries").queries) {
         var query = require("queries").queries[q]();
-        if (query.requires_user && !this.usernames)
-          continue;
         queries.push(query);
       }
     }
@@ -959,14 +963,107 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     }
   }
   
-  // FIXME: Should these be classic JS objects, or should they inherit another way?
+  
+  /**
+   * ReportPanel: loads and display statistics.
+   * Displays (optionally grouped) queries by adding "statsentry" templates onto the
+   * given selector.  When the associated query finishes, populates the associated value.
+   */
+  function ReportPanel(selector, displayedQueries, queryArgs, queryType, reportId) {
+    this.selector = selector;
+    this.displayedQueries = displayedQueries;
+    this.queryArgs = queryArgs;
+    this.queryType = queryType;
+    this.reportId = reportId;
+
+    this.getIndent = function (indentLevel) {
+      var indent = "";
+      if (indentLevel) {
+        for (var i = 0; i < indentLevel; i++)
+          indent += "&nbsp;&nbsp;";
+      }
+      return indent;
+    };
+    
+    this.displayEntry = function(queries, entry, indentLevel) {
+      switch (entry.type) {
+        case "group": this.displayGroup(queries, entry, indentLevel); break;
+        case "stat": this.displayStat(queries, entry, indentLevel); break;
+      }
+    };
+    
+    this.displayGroup = function (queries, group, indentLevel) {
+      if (indentLevel === undefined)
+        indentLevel = 0;
+      var indent = this.getIndent(indentLevel);
+      var entry = $("#templates .statsgroupentry").clone();
+      entry.find(".indent").html(indent);
+      entry.find(".name").text(group.name);
+      this.selector.append(entry);
+      
+      for (m in group.members)
+        this.displayEntry(queries, group.members[m], indentLevel+1);
+    };
+    
+    this.displayStat = function (queries, stat, indentLevel) {
+      var self = this;
+      var indent = this.getIndent(indentLevel);
+      var entry = $("#templates .statsentry").clone();
+      var query = require("queries").queries[stat.query]();
+      queries.push(query);
+      entry.find(".indent").html(indent);
+      entry.click(function() { window.open(bugzilla.uiQueryUrl(translateTerms(query["args_" + this.queryType](this.queryArgs)))); });
+      entry.attr("id", this.cleanId(this.reportId + this.queryType + query.id));
+      entry.addClass("pagelink");
+      entry.find(".name").text(stat.name);
+      entry.find(".value").text("...");
+      this.selector.append(entry);
+    };
+
+    this.cleanId = function(id) {
+      return id.replace(/@/g, "").replace(/\./g, "").replace(/_/g, "").replace(/\//g, "");
+    };
+    
+    this.queryDoneCb = function (query, queryType, results) {
+      var total = results[query.id];
+      $("#" + this.cleanId(this.reportId + this.queryType + query.id)).find(".value").text(total);
+    };
+
+    this.displayQueries = function (forceUpdate, callback) {
+      this.callback = callback;
+      var i;
+      var self = this;
+      var queries = [];
+      var previousWasGroup = false; 
+      
+      for (i = 0; i < this.displayedQueries.length; i++) {
+        if (previousWasGroup) {
+          var sep = $("#templates .statsgroupsep").clone();
+          this.selector.append(sep);
+        }
+        this.displayEntry(queries, this.displayedQueries[i], 0);
+        previousWasGroup = (this.displayedQueries[i].type == "group"); 
+      }
+      
+      this.QueryRunner = new QueryRunner(
+          forceUpdate, this.queryArgs,
+          function(query, queryType, value) { self.queryDoneCb(query, queryType, value); },
+          function() { self.callback(); }, queries, this.queryType);
+    }
+  };
+  
+  /**
+   * Report: Creates a panel with statistics.  If detailed, adds to-do and most-active panels.
+   */
   function Report(reportType, id, name, detailed, topLevel) {
     this.reportType = reportType;
     this.id = id;
     this.name = name;
     this.detailed = detailed;
     this.topLevel = topLevel;
-    this.toDo = [];
+    this.reportCell = null;
+    this.stuffToDo = null;
+    this.mostActive = null;
     
     this.displayedQueries = [ 
       { type: "group", name: "Blockers", members: [                       
@@ -1000,18 +1097,15 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     ];
     
     this.setupReportDisplay = function (selector) {
-      if (this.detailed)
-      {
-        this.entry = $("#templates td.detailedreportcell").clone();
-      } else {
-        this.entry = $("#templates td.reportcell").clone();
-      }
+      this.reportCell = $("#templates td." + (this.detailed ? "detailed" : "") + "reportcell").clone();
       
-      this.name_entry = this.entry.find(".name")
+      this.name_entry = this.reportCell.find(".name");
       this.name_entry.text(this.name);
       this.name_entry.addClass("loading");
-      this.stats = this.entry.find(".stats");
+      
+      this.stats = this.reportCell.find(".stats");
       this.stats.addClass("nodisplay");
+      
       if (this.topLevel) {
         var interimRelName = $("#templates .statsentry").clone();
         interimRelName.find(".name").text("Next Interim Release");
@@ -1024,33 +1118,27 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         this.stats.append(productRelName);
         this.stats.append(sep);
       }
-      selector.append(this.entry);
+      
+      selector.append(this.reportCell);
+      
       if (this.detailed) {
-        var reportbox = this.entry.find(".detailedreportbox");
-        this.entry.attr("colspan", "0");
-        this.details = $("#templates .reportdetails").clone();
-        reportbox.find(".reportboxtable").append(this.details);
-        this.toDo[0] = $("#templates .detailedreportfield").clone();
-        this.toDo[0].find(".name").text("Stuff to do...");
-        this.toDo[0].find(".name").addClass("loading");
-        this.toDo[0].find(".stats").addClass("nodisplay");
-        this.toDo[1] = $("#templates .detailedreportfield").clone();
-        this.toDo[1].find(".name").text("Most Active Bugs");
-        this.toDo[1].find(".name").addClass("loading");
-        $(reportbox.find(".detailedreportrow")).append(this.toDo[0]);
-        $(reportbox.find(".detailedreportrow")).append(this.toDo[1]);
+        var reportbox = this.reportCell.find(".detailedreportbox");
+        this.reportCell.attr("colspan", "0");
+        
+        this.stuffToDo = $("#templates .detailedreportfield").clone();
+        this.stuffToDo.find(".name").text("Stuff to do...");
+        this.stuffToDo.find(".name").addClass("loading");
+        this.stuffToDo.find(".stats").addClass("nodisplay");
+        
+        this.mostActive = $("#templates .detailedreportfield").clone();
+        this.mostActive.find(".name").text("Most Active Bugs");
+        this.mostActive.find(".name").addClass("loading");
+        
+        $(reportbox.find(".detailedreportrow")).append(this.stuffToDo);
+        $(reportbox.find(".detailedreportrow")).append(this.mostActive);
       }
     };
 
-    this.cleanId = function(id) {
-      return id.replace(/@/g, "").replace(/\./g, "").replace(/_/g, "").replace(/\//g, "");
-    };
-    
-    this.queryDoneCb = function (query, queryType, results) {
-      var total = results[query.id];
-      $("#" + this.cleanId(this.reportType + this.id + queryType + query.id)).find(".value").text(total);
-    };
-    
     this.showBugs = function showBugs(bugs) {
       var table = $("#templates .bugs").clone();
       var rowTemplate = table.find(".bug-row").remove();
@@ -1104,122 +1192,48 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     this.mostActiveLoaded = function(most_active) {
       var table = this.showBugs(most_active.slice(0, 10));
       table.addClass("nodisplay");
-      this.toDo[1].append(table);
-      this.toDo[1].find(".name").removeClass("loading");
-      table.css('visibility','visible').hide().fadeIn('slow');
+      this.mostActive.append(table);
+      this.mostActive.find(".name").removeClass("loading");
+      table.css("visibility", "visible").hide().fadeIn("slow");
       table.removeClass("nodisplay");
       table.fadeIn();
     }
     
     this.allDoneCb = function() {
       this.name_entry.removeClass("loading");
-      this.entry.find(".stats").css('visibility','visible').hide().fadeIn('slow');
-
-      this.entry.find(".stats").removeClass("nodisplay");
-      this.entry.find(".stats").fadeIn();
-      //var d = new Date();
-      //console.log("Report " + this.name + " loaded in " + ((d.getTime() - startTime)/1000) + " s");
+      this.reportCell.find(".stats").css("visibility", "visible").hide().fadeIn("slow");
+      this.reportCell.find(".stats").removeClass("nodisplay");
+      this.reportCell.find(".stats").fadeIn();
       var self = this;
       if (this.detailed) {
-        require("app/ui/mostactive").get(function(bugs) { self.mostActiveLoaded(bugs); }, this.prodcomps());
+        require("app/ui/mostactive").get(function(bugs) { self.mostActiveLoaded(bugs); },
+            this.prodcomps());
       }
     };
 
     this.allDoneToDoCb = function() {
-      this.toDo[0].find(".name").removeClass("loading");
-      this.toDo[0].find(".stats").css('visibility','visible').hide().fadeIn('slow');
-
-      this.toDo[0].find(".stats").removeClass("nodisplay");
-      this.toDo[0].find(".stats").fadeIn();
+      this.stuffToDo.find(".name").removeClass("loading");
+      this.stuffToDo.find(".stats").css('visibility','visible').hide().fadeIn('slow');
+      this.stuffToDo.find(".stats").removeClass("nodisplay");
+      this.stuffToDo.find(".stats").fadeIn();
     };
 
-    this.getIndent = function (indentLevel) {
-      var indent = "";
-      if (indentLevel) {
-        for (var i = 0; i < indentLevel; i++)
-          indent += "&nbsp;&nbsp;";
-      }
-      return indent;
-    };
-    
-    this.displayEntry = function(selector, queries, entry, indentLevel, queryType) {
-      switch (entry.type) {
-        case "group": this.displayGroup(selector, queries, entry, indentLevel, queryType); break;
-        case "stat": this.displayStat(selector, queries, entry, indentLevel, queryType); break;
-      }
-    };
-    
-    this.displayGroup = function (selector, queries, group, indentLevel, queryType) {
-      if (indentLevel === undefined)
-        indentLevel = 0;
-      var indent = this.getIndent(indentLevel);
-      var entry = $("#templates .statsgroupentry").clone();
-      entry.find(".indent").html(indent);
-      entry.find(".name").text(group.name);
-      selector.append(entry);
-      
-      for (m in group.members)
-        this.displayEntry(selector, queries, group.members[m], indentLevel+1, queryType);
-    };
-    
-    this.displayStat = function (selector, queries, stat, indentLevel, queryType) {
-      var self = this;
-      var indent = this.getIndent(indentLevel);
-      var entry = $("#templates .statsentry").clone();
-      var query = require("queries").queries[stat.query]();
-      queries.push(query);
-      entry.find(".indent").html(indent);
-      if (queryType == "unassigned")
-        entry.click(function() { window.open(bugzilla.uiQueryUrl(translateTerms(query.args_unassigned(self.prodcomps())))); });
-      else
-        entry.click(function() { window.open(bugzilla.uiQueryUrl(translateTerms(query.args_assigned(self.usernames())))); });
-      entry.attr("id", this.cleanId(this.reportType + this.id + queryType + query.id));
-      entry.addClass("pagelink");
-      entry.find(".name").text(stat.name);
-      entry.find(".value").text("...");
-      selector.append(entry);
-    };
-    
     this.displayQueries = function (selector, forceUpdate) {
       this.selector = selector;
-      var i;
       var self = this;
-      var queries = [];
-      var toDoQueries = [];
-      var previousWasGroup = false; 
       
-      for (i = 0; i < this.displayedQueries.length; i++) {
-        if (previousWasGroup) {
-          var sep = $("#templates .statsgroupsep").clone();
-          this.stats.append(sep);
-        }
-        this.displayEntry(this.stats, queries, this.displayedQueries[i], 0, "assigned");
-        previousWasGroup = (this.displayedQueries[i].type == "group"); 
-      }
+      var queryPanel = new ReportPanel(this.stats, this.displayedQueries, this.usernames(),
+          "assigned", this.reportType + this.id);
+      queryPanel.displayQueries(forceUpdate, function() { self.allDoneCb(); });
       
-      this.QueryRunner = new QueryRunner(
-          forceUpdate, this.usernames(), this.prodcomps(),
-          function(query, queryType, value) { self.queryDoneCb(query, queryType, value); },
-          function() { self.allDoneCb(); }, queries, "assigned");
-
       if (this.detailed) {
-        for (i = 0; i < this.stuffToDoQueries.length; i++) {
-          this.displayEntry(this.toDo[0].find(".stats"), toDoQueries, this.stuffToDoQueries[i], 0, "unassigned");
-        }
+        var toDoQueryPanel = new ReportPanel(this.stuffToDo.find(".stats"), this.stuffToDoQueries,
+            this.prodcomps(), "unassigned", this.reportType + this.id);
+        toDoQueryPanel.displayQueries(forceUpdate, function() { self.allDoneToDoCb(); });
       }
-
-      this.toDoQueryRunner = new QueryRunner(
-          forceUpdate, this.usernames(), this.prodcomps(),
-          function(query, queryType, value) { self.queryDoneCb(query, queryType, value); },
-          function() { self.allDoneToDoCb(); }, toDoQueries, "unassigned");
     };
   }
   
-  function ToDoList(teamId) {
-    this.teamId = teamId;
-    
-    $("#todo").fadeIn();    
-  }
   
   function TeamReport(teamId, team, detailed, topLevel, groupType) {
     if (groupType)
@@ -1257,15 +1271,9 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       return prodcomps;
     };
     
-    this.createToDo = function () {
-      this.toDoList = new ToDoList(this.teamid);
-    };
-    
     this.update = function (selector, forceUpdate) {
       this.indicatorLoaders = [];
       this.setupReportDisplay(selector);
-      if (this.singleTeamView)
-        this.createToDo();
       this.name_entry.addClass("pagelink");
       var self = this;
       if (this.groupType == "team")
@@ -1274,36 +1282,10 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         this.name_entry.click(function() { window.open(require("app/ui/hash").divisionToHash(self.id)); });
       this.displayQueries(selector, forceUpdate);
     };
-
-    this.displayIndicators = function (indicatorPanel, indicatorList) {
-      var count = 0;
-      var indicatorRow = null;
-
-      for (l in indicatorList) {
-        if (count++ % 3 == 0) {
-          indicatorRow = $("#templates .indicator-row").clone();
-          indicatorPanel.append(indicatorRow);
-        }
-        var indicatorBox = $("#templates .indicator-box").clone();
-        indicatorBox.addClass("indicatorLoading");
-        indicatorBox.attr("id", "ind" + count);
-        indicatorBox.find(".title").text(indicatorList[l].text);
-        indicatorBox.attr("link", indicatorList[l].link);
-        indicatorBox.attr("title", indicatorList[l].tip);
-        indicatorBox.tipsy();
-        // tipsy seems to hang around after we click on a link, so we have to remove it manually.
-        indicatorBox.click(function() { $.data(this, 'active.tipsy').remove(); window.open($(this).attr("link")); return false; });
-        indicatorBox.addClass("pagelink");
-        if ("usernames" in indicatorList[l]) {
-          var indicatorLoader = new IndicatorLoader(indicatorList[l].usernames, indicatorBox);
-          this.indicatorLoaders.push(indicatorLoader);
-        }
-        indicatorRow.append(indicatorBox);
-      }
-    };
   }
   TeamReport.prototype = new Report;
 
+  
   function UserReport(userId, user, detailed) {
     Report.call(this, "user", userId, user.nick ? user.nick : user.name, detailed, false);
     this.user = user;
@@ -1326,6 +1308,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     };
   }
   UserReport.prototype = new Report;
+  
   
   function translateTerms(args) {
     var newTerms = {};
@@ -1440,7 +1423,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       report.update(detailedReportContainer, forceUpdate);
       if ("teams" in division) {
         teamList($("#reports"), teamListTemplate, forceUpdate, division.teams);
-        report.entry.attr("colspan", REPORTS_PER_ROW);
+        report.reportCell.attr("colspan", REPORTS_PER_ROW);
       }
     } else if (who.team != -1) {
       teamReports = [];
@@ -1465,7 +1448,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       report.update(detailedReportContainer, forceUpdate);
       if ("members" in team) {
         userList($("#reports"), memberListTemplate, forceUpdate, team.members);
-        report.entry.attr("colspan", REPORTS_PER_ROW);
+        report.reportCell.attr("colspan", REPORTS_PER_ROW);
       }
     } else if (who.user != -1) {
       userReports = [];
