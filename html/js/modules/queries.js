@@ -234,10 +234,10 @@ Require.modules["queries"] = function(exports, require) {
     };
   },
 
-  patches_awaiting_review: function() {
+  nonblocker_patches_awaiting_review: function() {
     return {
-      id: 'patches_awaiting_review',
-      name: 'Patches awaiting review',
+      id: 'nonblocker_patches_awaiting_review',
+      name: 'NonBlocker Patches awaiting review',
       short_form: "P",
       requires_user: true,
       include_fields: "attachments",
@@ -258,10 +258,35 @@ Require.modules["queries"] = function(exports, require) {
     };
   },
 
-  review_queue: function() {
+  blocker_patches_awaiting_review: function() {
     return {
-      id: 'review_queue',
-      name: 'Review queue',
+      id: 'blocker_patches_awaiting_review',
+      name: 'Blocker Patches awaiting review',
+      short_form: "P",
+      requires_user: true,
+      include_fields: "attachments",
+      //priority: 1,
+      args: function(usernames) {
+        // username is mandatory
+        var a = {
+          resolution: "---",
+          type0_HYPH_0_HYPH_0: "substring",
+          field0_HYPH_0_HYPH_0: "flagtypes.name",
+          value0_HYPH_0_HYPH_0: "review?"
+        };
+        addBlockerQuery(a, 1);
+        return addUserQuery("setters.login_name", "substring", a, 2, usernames);
+      },
+      get_values: function(query_results, response) {
+        searchReviews("setter", query_results, response);
+      }
+    };
+  },
+
+  nonblocker_review_queue: function() {
+    return {
+      id: 'nonblocker_review_queue',
+      name: 'NonBlocker Review Queue',
       short_form: "RQ",
       requires_user: true,
       threshold: [15, 8],
@@ -279,7 +304,30 @@ Require.modules["queries"] = function(exports, require) {
       }
     };
   },
-  
+
+  blocker_review_queue: function() {
+    return {
+      id: 'blocker_review_queue',
+      name: 'Blocker Review Queue',
+      short_form: "RQ",
+      requires_user: true,
+      threshold: [15, 8],
+      include_fields: "attachments",
+      //priority: 0,
+      args: function(usernames) {
+        var a = {
+          resolution: "---"
+        };
+        // REST API is flag.requestee
+        addBlockerQuery(a, 0);
+        return addUserQuery("requestees.login_name", "equals", a, 1, usernames);
+      },
+      get_values: function(query_results, response) {
+        searchReviews("requestee", query_results, response);
+      }
+    };
+  },
+
   topcrash: function() {
     return {
       id: 'topcrash',

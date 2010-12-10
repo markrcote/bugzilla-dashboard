@@ -1026,12 +1026,20 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         {type: "stat", name: "All", query: "open_blockers"},
         {type: "stat", name: "Security", query: "security"},
         {type: "stat", name: "Regressions", query: "regressions"},
-        {type: "stat", name: "Crashers", query: "crashers"}] },
+        {type: "stat", name: "Crashers", query: "crashers"} ]
+      },
       { type: "group", name: "Fixed in Last 30 Days", members: [ 
         {type: "stat", name: "Blockers", query: "blockers_fixed_30_days"},
-        {type: "stat", name: "NonBlockers", query: "nonblockers_fixed_30_days"} ] },
-      { type: "stat", name: "Patches Awaiting Review", query: "patches_awaiting_review"},
-      { type: "stat", name: "Review Queue", query: "review_queue"}
+        {type: "stat", name: "NonBlockers", query: "nonblockers_fixed_30_days"} ]
+      },
+      { type: "group", name: "Patches Awaiting Review", members: [ 
+        { type: "stat", name: "Blockers", query: "blocker_patches_awaiting_review"},
+        { type: "stat", name: "NonBlockers", query: "nonblocker_patches_awaiting_review"} ]
+      },
+      { type: "group", name: "Review Queues", members: [ 
+        { type: "stat", name: "Blockers", query: "blocker_review_queue"},
+        { type: "stat", name: "NonBlockers", query: "nonblocker_review_queue"} ]
+      }
     ];
     
     this.stuffToDoQueries = [
