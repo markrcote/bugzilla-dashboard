@@ -29,12 +29,21 @@ CREATE TABLE prodcomps (
     FOREIGN KEY (team_id) REFERENCES teams(id)
 );
 
-CREATE TABLE members (
+CREATE TABLE users (
     id INT AUTO_INCREMENT,
     PRIMARY KEY (id),
     name TEXT COLLATE utf8_bin,
     bugemail TEXT COLLATE utf8_bin,
     nick TEXT COLLATE utf8_bin,
+    site_admin BOOLEAN
+);
+
+CREATE TABLE members (
+    id INT AUTO_INCREMENT,
+    PRIMARY KEY (id),
+    user_id INT,
+    FOREIGN KEY (user_id) REFERENCES users(id),
     team_id INT,
-    FOREIGN KEY (team_id) REFERENCES teams(id)
+    FOREIGN KEY (team_id) REFERENCES teams(id),
+    team_admin BOOLEAN
 );

@@ -25,14 +25,14 @@
 <div class="adminpanel">
   <div class="bolttopleft"></div><div class="bolttopright"></div><div class="boltbottomleft"></div><div class="boltbottomright"></div>
   <div id="admindivisionlist" class="adminlist">
-    <h2>Divisions <button class="requires-auth-login adminadd adminbutton" type="button" data-dialog="add-division">+</button></h2>
+    <h2>Divisions <button class="siteadminbutton adminadd adminbutton nodisplay" type="button" data-dialog="add-division">+</button></h2>
     <div class="entitylist"></div>
   </div>
 </div>
 <div class="adminpanel">
   <div class="bolttopleft"></div><div class="bolttopright"></div><div class="boltbottomleft"></div><div class="boltbottomright"></div>
   <div id="adminteamlist" class="adminlist">
-    <h2>Teams <button class="requires-auth-login adminadd adminbutton" type="button" data-dialog="add-team">+</button></h2>
+    <h2>Teams <button class="siteadminbutton adminadd adminbutton nodisplay" type="button" data-dialog="add-team">+</button></h2>
     <div class="entitylist"></div>
   </div>
 </div>
@@ -42,9 +42,9 @@
   <div class="bolttopleft"></div><div class="bolttopright"></div><div class="boltbottomleft"></div><div class="boltbottomright"></div>
   <div id="adminteamdetails" class="adminlist">
     <h2>Team Details</h2>
-    <h3>Products and Components <button class="requires-auth-login adminadd adminbutton" type="button" data-dialog="add-prodcomp">+</button></h3>
+    <h3>Products and Components <button class="teamadminbutton adminadd adminbutton nodisplay" type="button" data-dialog="add-prodcomp">+</button></h3>
     <div id="prodcomps" class="entitylist"></div>
-    <h3>Members <button class="requires-auth-login adminadd adminbutton" type="button" data-dialog="add-member">+</button></h3>
+    <h3>Members <button id="addmemberbutton" class="requires-auth-login adminadd adminbutton" type="button" data-dialog="add-member">+</button></h3>
     <div id="members" class="entitylist"></div>
   </div>
 </div>
@@ -82,6 +82,16 @@
   </table>
   <br/>
   <input type="submit" id="add-member-submit"
+         value="Add"/>
+  </form>
+  </div>
+</div>
+<div id="add-member-self" class="dialog">
+  <div class="content">
+  <form id="add-member-self-form">
+  <p>Add yourself to this team?</p>
+  <br/>
+  <input type="submit" id="add-member-self-submit"
          value="Add"/>
   </form>
   </div>
@@ -151,7 +161,11 @@
 </div>
 <div id="errors"></div>
 <div id="templates">
-  <div class="listentry"><div class="listentrytext"></div><div class="listentrybutton nodisplay"><button class="requires-auth-login adminbutton buttondel" type="button"">&ndash;</div></div>
+  <div class="normallistentry listentry"><div class="listentrytext"><span class="listentrytextspan"></span></div><div class="listentrybutton nodisplay buttondel"><button class="siteadminbutton adminbutton" type="button">&ndash;</button></div></div>
+  <div class="prodcomplistentry listentry"><div class="listentrytext"><span class="listentrytextspan"></span></div><div class="listentrybutton nodisplay buttondel"><button class="teamadminbutton adminbutton" type="button">&ndash;</button></div></div>
+  <div class="memberlistentry listentry"><div class="listentrytext"><span class="listentrytextspan"></span><span class="listentrysiteadminspan nodisplay"> <b>[site admin]</b></span><span class="listentryteamadminspan nodisplay"> <b>[team admin]</b></span></div><div class="listentrybutton nodisplay buttonsiteadmin"><button class="siteadminbutton adminbutton" type="button"></button></div>
+  <div class="listentrybutton nodisplay buttonteamadmin"><button class="teamadminbutton adminbutton" type="button"></button></div>
+  <div class="listentrybutton nodisplay buttondel"><button class="teamadminbutton adminbutton" type="button">&ndash;</button></div></div>
   <div class="listentrynone">none</div>
   <div class="errors">
     <div class="bugzilla-api-error">I had trouble talking to Bugzilla.

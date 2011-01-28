@@ -71,6 +71,8 @@ Require.modules["app/login"] = function(exports, require) {
   var password;
   var passwordProvider;
   var cache = require("cache");
+  var teamAdmins = [];
+  var siteAdmin = false;
 
   exports.setPasswordProvider = function setPasswordProvider(pp) {
     passwordProvider = pp;
@@ -92,11 +94,13 @@ Require.modules["app/login"] = function(exports, require) {
       username: username,
       password: password,
       isLoggedIn: isLoggedIn,
-      isAuthenticated: isAuthenticated
+      isAuthenticated: isAuthenticated,
+      teamAdmins: teamAdmins,
+      siteAdmin: siteAdmin
     };
   };
 
-  exports.set = function set(newUsername, newPassword) {
+  exports.set = function set(newUsername, newPassword, newSiteAdmin, newTeamAdmins) {
     if ((newUsername && newUsername != "") &&
         (!newPassword || newPassword == "") &&
         (passwordProvider))
@@ -108,11 +112,18 @@ Require.modules["app/login"] = function(exports, require) {
 
     username = newUsername;
     password = newPassword;
+    siteAdmin = newSiteAdmin;
+    teamAdmins = newTeamAdmins;
 
-    cache.set('username', username);
-    cache.set('password', password);
+    cache.set("username", username);
+    cache.set("password", password);
+    cache.set("siteAdmin", siteAdmin);
+    cache.set("teamAdmins", teamAdmins);
 
     $("#username").text(username);
+    if (siteAdmin) {
+      $("#username").append(" <i>[admin]</i>");
+    }
 
     var info = exports.get();
 
@@ -122,7 +133,7 @@ Require.modules["app/login"] = function(exports, require) {
   var logoutCommand = {
       name: "logout",
       execute: function execute() {
-        require("app/login").set("", "");
+        require("app/login").set("", "", false, []);
         var who = require("app/who").get();
       }
     };
@@ -131,7 +142,16 @@ Require.modules["app/login"] = function(exports, require) {
     require("app/commands").register(logoutCommand);
     var cachedUsername = cache.get("username");
     var cachedPassword = cache.get("password");
-    exports.set(cachedUsername, cachedPassword);
+    var cachedSiteAdmin = cache.get("siteAdmin");
+    var cachedTeamAdminVal = cache.get("teamAdmins");
+    if (cachedTeamAdminVal === undefined) {
+      cachedTeamAdmin = [];
+    } else {
+      cachedTeamAdmin = cachedTeamAdminVal;
+    }
+    
+    exports.set(cachedUsername, cachedPassword, cachedSiteAdmin,
+        cachedTeamAdmin);
   }
 };
 
@@ -232,7 +252,7 @@ Require.modules["app/ui/login-form"] = function(exports, require) {
     $("#login-form").removeClass("loading");
     if (!response.error) {
       require("app/login").set($("#login .username").val(),
-          $("#login .password").val());
+          $("#login .password").val(), response.user.site_admin, response.user.team_admins);
       require("app/errors").clear();
       $("#login").fadeOut();
     } else {
@@ -247,7 +267,7 @@ Require.modules["app/ui/login-form"] = function(exports, require) {
       event.preventDefault();
       $("#login-form").addClass("loading");
       require("app/server").query("POST", "/login/", loginLoaded,
-          JSON.stringify({login: {username: $("#login .username").val(), password: $("#login .password").val()}}));
+          require("app/server").authJSON({login: {username: $("#login .username").val(), password: $("#login .password").val()}}));
     });
 
   require("app/login").whenChanged(
@@ -502,15 +522,26 @@ Require.modules["app/server"] = function(exports, require) {
   var server_url = "/bzdash";
   var xhrQueue = require("xhr/queue").create();
 
-  exports.query = function query(method, search, onLoad, body) {
+  exports.authJSON = function authJSON(o) {
+    var currentLogin = require("app/login").get();
+    if (currentLogin.isAuthenticated) {
+      o['username'] = currentLogin.username;
+      o['password'] = currentLogin.password;
+    }
+    return JSON.stringify(o);
+  }
+  
+  exports.query = function query(method, search, onLoadFunc, body) {
+    var onLoad = onLoadFunc ? [onLoadFunc] : [];
+    var url = server_url + search;
     var xhrData = {
         method: method,
-        url: server_url + search,
+        url: url,
         headers: [
           ["Accept", "application/json"],
           ["Content-Type", "application/json"]
         ],
-        onLoad: [onLoad],
+        onLoad: onLoad,
         onErr: [],
         body: body
       };
@@ -533,6 +564,7 @@ Require.modules["app/ui/admin"] = function(exports, require) {
   var isAuthenticated = false;  // set by update()
   var products = {};
 
+  var currentLogin = null;
   var currentDivisionId = -1;
   var currentTeamId = -1;
 
@@ -542,12 +574,13 @@ Require.modules["app/ui/admin"] = function(exports, require) {
     return function() { selectionChanged(divId, teamId); };
   }
 
-  function delEntryDialogFunc(entry, entryType, id) {
+  function delEntryDialogFunc(parent, entry, entryType, id) {
     return function() {
       var dialog = $("#del-entry");
       $(dialog.find("#del-entry-type")).text(entryType);
       $(dialog.find("#del-entry-name")).text($(entry.find(".listentrytext")).text());
-      $("#del-entry form").submit(delEntryFunc(dialog, entry, entryType, id));
+      $("#del-entry form").unbind('submit');
+      $("#del-entry form").submit(delEntryFunc(dialog, parent, entry, entryType, id));
       dialog.fadeIn(
         function() {
           dialog.find("input:first").focus();
@@ -555,29 +588,93 @@ Require.modules["app/ui/admin"] = function(exports, require) {
     }
   }
 
-  function delEntryFunc(dialog, entry, entryType, id) {
+  function delEntryFunc(dialog, parent, entry, entryType, id) {
     return function(event) {
+      var noneEntry = null;
       event.preventDefault();
-      server.query("DEL", "/" + entryType + "/" + id);
+      server.query("DEL", "/" + entryType + "/" + id + "?username=" + currentLogin.username + "&password=" + currentLogin.password, function() {});
       entry.remove();
+      if (parent.find(".listentry").length == 0) {
+        noneEntry = $("#templates .listentrynone").clone();
+        parent.append(noneEntry);
+      }
       dialog.fadeOut();
     };
   }
   
-  function newListEntry(parent, entryType, id, text, onclick) {
-    var entry = $("#templates .listentry").clone();
+  function newListEntry(parent, entryType, id, text, onclick, templateName) {
+    if (!templateName)
+      templateName = "normallistentry";
+    var entry = $("#templates ." + templateName).clone();
     var entrytext = $(entry.find(".listentrytext"));
-    var entrybutton = $(entry.find(".listentrybutton"));
+    var delbuttondiv = $(entry.find(".buttondel"));
     if (id)
       entry.attr("id", entryType + id);
     if (text)
-      entrytext.text(text);
+      entrytext.find(".listentrytextspan").text(text);
     if (onclick)
       entrytext.click(onclick);
-    entry.hover(function() { $($(this).find(".listentrybutton")).removeClass("nodisplay"); },
-                function() { $($(this).find(".listentrybutton")).addClass("nodisplay"); });
-    entrybutton.click(delEntryDialogFunc(entry, entryType, id));
+    entry.hover(function() { $(entry.find(".listentrybutton")).removeClass("nodisplay"); },
+                function() { $(entry.find(".listentrybutton")).addClass("nodisplay"); });
+    $(delbuttondiv.find("button")).click(delEntryDialogFunc(parent, entry, entryType, id));
     parent.append(entry);
+    return entry;
+  }
+  
+  function newMemberListEntry(parent, member) {
+    var text = "";
+    if (member.nick)
+      text = member.nick;
+    else
+      text = member.name;
+    var entry = newListEntry(parent, "member", member.id, text, null, "memberlistentry");
+    if (member.site_admin) {
+      entry.find(".listentrysiteadminspan").removeClass("nodisplay");
+    }
+    if (member.team_admin) {
+      entry.find(".listentryteamadminspan").removeClass("nodisplay");
+    }
+    
+    if (member.bugemail == currentLogin.username) {
+      $($(entry.find(".buttondel")).find("button")).removeClass("teamadminbutton nodisplay");
+    }
+    
+    if (currentLogin.siteAdmin || currentLogin.teamAdmins.indexOf(currentTeamId) >= 0) {
+      $(entry.find(".buttonsiteadmin")).find("button").text(member.site_admin ? "remove site admin" : "make site admin");
+      $(entry.find(".buttonsiteadmin")).find("button").click(function() {
+        server.query("PUT", "/user/" + member.user_id, function() {
+          if (currentTeamId == member.team_id) {
+            currentTeamId = -1; 
+            selectionChanged(-1, member.team_id);
+            }
+          },
+          server.authJSON({users: [{site_admin: !member.site_admin}]}));
+        }
+      );
+
+      $(entry.find(".buttonteamadmin")).find("button").text(member.team_admin ? "remove team admin" : "make team admin");
+      $(entry.find(".buttonteamadmin")).find("button").click(function() {
+        server.query("PUT", "/member/" + member.id, function() {
+          if (currentTeamId == member.team_id) {
+            currentTeamId = -1; 
+            selectionChanged(-1, member.team_id);
+            }
+          },
+          server.authJSON({members: [{team_admin: !member.team_admin}]}));
+        }
+      );
+
+      // FIXME: REMOVE
+      entry.hover(function() {
+                    $(entry.find(".buttonsiteadmin")).removeClass("nodisplay");
+                    $(entry.find(".buttonteamadmin")).removeClass("nodisplay");
+                  },
+                  function() {
+                    $(entry.find(".buttonsiteadmin")).addClass("nodisplay");
+                    $(entry.find(".buttonteamadmin")).addClass("nodisplay");
+                  });
+    }
+    return entry;
   }
   
   function divisionListLoaded(response) {
@@ -597,6 +694,8 @@ Require.modules["app/ui/admin"] = function(exports, require) {
     if (response.divisions.length > 0) {
       selectionChanged(response.divisions[0].id, -1);
     }
+    
+    checkButtons();
   }
 
   function divisionLoaded(response) {
@@ -610,16 +709,34 @@ Require.modules["app/ui/admin"] = function(exports, require) {
                    selectionChangedFunc(response.divisions[0].id, response.divisions[0].teams[i].id));
     }
 
-    if (response.divisions.length > 0 && response.divisions[0].teams.length > 0)
+    if (response.divisions.length > 0 && response.divisions[0].teams.length > 0) {
       selectionChanged(response.divisions[0].id, response.divisions[0].teams[0].id);
+    } else {
+      noTeams();
+    }
+    
+    checkButtons();
   }
 
+  function noTeams() {
+    currentTeamId = -1;
+    if (!$("#adminteamdetails").hasClass("nodisplay")) {
+      $("#adminteamdetails").addClass("nodisplay");
+    }
+  }
+  
   function teamLoaded(response) {
+    $("#adminteamdetails").removeClass("nodisplay");
     $("#adminteamdetails").removeClass("loading");
     if (response.teams.length == 0)
       return;
-
+    
     $("#adminteamdetails").find("h2").text(response.teams[0].name + " Team Details");
+    if (currentLogin.siteAdmin || currentLogin.teamAdmins.indexOf(currentTeamId) >= 0) {
+      $("#addmemberbutton").attr("data-dialog", "add-member");
+    } else {
+      $("#addmemberbutton").attr("data-dialog", "add-member-self");
+    }
 
     if (response.teams[0].prodcomps.length == 0) {
       var entry = $("#templates .listentrynone").clone();
@@ -633,7 +750,9 @@ Require.modules["app/ui/admin"] = function(exports, require) {
         newListEntry($("#adminteamdetails").find("#prodcomps"),
                      "prodcomp",
                      response.teams[0].prodcomps[i].id,
-                     text);
+                     text,
+                     null,
+                     "prodcomplistentry");
       }
     }
 
@@ -643,17 +762,12 @@ Require.modules["app/ui/admin"] = function(exports, require) {
     } else {
       response.teams[0].members.sort(require("app/ui/sort").sortUsers);
       for (var i = 0; i < response.teams[0].members.length; i++) {
-        var text = "";
-        if (response.teams[0].members[i].nick)
-          text = response.teams[0].members[i].nick;
-        else
-          text = response.teams[0].members[i].name;        
-        newListEntry($("#adminteamdetails").find("#members"),
-                     "member",
-                     response.teams[0].members[i].id,
-                     text);
+        newMemberListEntry($("#adminteamdetails").find("#members"),
+                     response.teams[0].members[i]);
       }
     }
+    
+    checkButtons();
   }
 
   function updateSelectedEntity(entities, id) {
@@ -741,7 +855,7 @@ Require.modules["app/ui/admin"] = function(exports, require) {
     var teamId = currentTeamId;
     currentTeamId = -1;  // force refresh
     server.query("POST", "/prodcomp/", function(response) { selectionChanged(-1, teamId); },
-        JSON.stringify({prodcomps: data}));
+        server.authJSON({prodcomps: data}));
     $("#add-prodcomp").fadeOut();
   }
 
@@ -749,7 +863,7 @@ Require.modules["app/ui/admin"] = function(exports, require) {
     event.preventDefault();
     currentDivisionId = -1;
     server.query("POST", "/division/", loadDivisions,
-        JSON.stringify({divisions: [{name: $("#add-division-query").val()}]}));
+        server.authJSON({divisions: [{name: $("#add-division-query").val()}]}));
     $("#add-division").fadeOut();
     $("#add-division-query").val("");
   });
@@ -759,46 +873,49 @@ Require.modules["app/ui/admin"] = function(exports, require) {
     var divisionId = currentDivisionId;
     currentDivisionId = -1;
     server.query("POST", "/team/", function(response) { selectionChanged(divisionId, -1); },
-        JSON.stringify({teams: [{name: $("#add-team-query").val(), division_id: divisionId}]}));
+        server.authJSON({teams: [{name: $("#add-team-query").val(), division_id: divisionId}]}));
     $("#add-team").fadeOut();
     $("#add-team-query").val("");
   });
 
   $("#add-member .query").autocomplete(require("app/ui/find-user").options);
 
+  function addMember(username, teamId, onDone) {
+    xhrQueue.enqueue(
+        function() {
+          return bugzilla.user(
+            username,
+            function(response) {
+              // nick is extracted by server
+              server.query("POST", "/member/", function(response) { selectionChanged(-1, teamId); },
+                  server.authJSON(
+                      { members: [ {team_id: teamId, name: response.real_name, bugemail: response.email} ] }));
+              onDone();
+            }
+          );
+        }
+      );
+  }
+  
   $("#add-member form").submit(function(event) {
     event.preventDefault();
     var teamId = currentTeamId;
     currentTeamId = -1;
-    var username = $("#add-member .query").val();
-    xhrQueue.enqueue(
-      function() {
-        return bugzilla.user(
-          username,
-          function(response) {
-            // extract nick if present, e.g. "Jane Doe [:jdoe]", "John Smith ( :jsmith )", etc. 
-            // some people skip the parentheses/brackets... in the interests of not making
-            // the first re more complicated, we use two patterns.
-            var nick = "";
-            var nickPatterns = [/[\(\[][\s]*:([^\s\):,]*)[\s]*[\)\]]/, /:([^\s,:]*)/];
-            for (var i = 0; i < nickPatterns.length; i++) {
-              var match = nickPatterns[i].exec(response.real_name);
-              if (match) {
-                nick = match[1];
-                break;
-              }
-            }
-            server.query("POST", "/member/", function(response) { selectionChanged(-1, teamId); },
-                JSON.stringify(
-                    { members: [ {team_id: teamId, name: response.real_name, nick: nick, bugemail: response.email} ] }));
-            $("#add-member").fadeOut();
-            $("#add-member-query").val("");
-          }
-        );
-      }
-    );
+    addMember($("#add-member .query").val(), teamId, function() {
+      $("#add-member").fadeOut();
+      $("#add-member-query").val("");
+    });
   });
-  
+
+  $("#add-member-self form").submit(function(event) {
+    event.preventDefault();
+    var teamId = currentTeamId;
+    currentTeamId = -1;
+    addMember(currentLogin.username, teamId, function() {
+      $("#add-member-self").fadeOut();
+    });
+  });
+
   $("#del-team-cancel").click(function () { $("#del-entry").fadeOut(); });
 
   var dashboardCommand = {
@@ -807,12 +924,33 @@ Require.modules["app/ui/admin"] = function(exports, require) {
         window.open("index.html");  
       }
     };
+  
+  function checkButtons() {
+    if (currentLogin.siteAdmin) {
+      $(".siteadminbutton").removeClass("nodisplay");
+    } else {
+      $(".siteadminbutton").each(function() {
+          if (!$(this).hasClass("nodisplay"))
+            $(this).addClass("nodisplay");
+      });
+    }
+
+    if (isAuthenticated && currentTeamId != -1 && (currentLogin.siteAdmin || (currentLogin.teamAdmins.indexOf(currentTeamId) >= 0))) {
+      $(".teamadminbutton").removeClass("nodisplay");
+    } else {
+      $(".teamadminbutton").each(function() {
+          if (!$(this).hasClass("nodisplay"))
+            $(this).addClass("nodisplay");
+      });
+    }
+  }
 
   function update(_isAuthenticated) {
     isAuthenticated = _isAuthenticated;
     
-    current_who = require("app/who").get();
+    currentLogin = require("app/login").get();
     loadDivisions();
+    checkButtons();
   }
 
   exports.init = function init() {
@@ -1224,6 +1362,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       
       var queryPanel = new ReportPanel(this.stats, this.displayedQueries, this.usernames(),
           "assigned", this.reportType + this.id);
+      
       queryPanel.displayQueries(forceUpdate, function() { self.allDoneCb(); });
       
       if (this.detailed) {
@@ -1248,8 +1387,9 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     this.usernames = function () {
       var i;
       var l = [];
-      if ("members" in this.team)
+      if ("members" in this.team) {
         l = l.concat(this.team.members.map(function(x) { return x.bugemail; }));
+      }
       if ("teams" in this.team) {
         for (i = 0; i < this.team.teams.length; i++) {
           l = l.concat(this.team.teams[i].members.map(function(x) { return x.bugemail; }));
@@ -1473,8 +1613,9 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       var report = new UserReport(who.user, user, true);
       userReports.push(report);
       report.update(detailedReportContainer, forceUpdate);
-    } else
+    } else {
       divisionList($("#reports"), teamListTemplate, forceUpdate);
+    }
   };
 
   var refreshCommand = {
