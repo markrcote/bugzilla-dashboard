@@ -93,7 +93,7 @@ Require.modules["queries"] = function(exports, require) {
   exports.DEFAULT_PRIORITY = 5;
   
   exports.RELEASE_NAME = "Firefox 4";
-  exports.NEXT_INTERIM_RELEASE = "Beta7";
+  exports.NEXT_INTERIM_RELEASE = "Beta11";
   exports.NEXT_PRODUCT_RELEASE = "2.0";
   var productRel = "20";
 
