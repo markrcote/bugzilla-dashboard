@@ -1226,10 +1226,21 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       entry = $("#templates .statsentry").clone();
       entry.find(".indent").html(this.getIndent(indentLevel));
       entry.attr("id", this.cleanId(this.reportId + this.queryType + query.id));
-      //entry.click(function() { window.open(bugzilla.uiQueryUrl(translateTerms(q["args_" + self.queryType](q.queryArgs)))); });
-      //entry.addClass("pagelink");
+      entry.addClass("pagelink");
       entry.find(".name").text(stat.name);
       entry.find(".value").text("...");
+      entry.attr("title", "");
+      entry.attr("tipsy-state", "hide");
+      entry.tipsy({gravity: 'w', html: true, trigger: 'manual', opacity: 1});
+      entry.click(function() {
+        var state = $(this).attr("tipsy-state");
+        self.selector.find(".statsentry").each(function() { $(this).tipsy("hide");  $(this).attr("tipsy-state", "hide"); });
+        if (state == "hide") {
+          $(this).tipsy("show");
+          $(this).attr("tipsy-state", "show");
+        }
+        return false;
+      });
       this.selector.append(entry);
       
       for (var i = 0; i < this.queryArgs.length; i++) {
@@ -1241,69 +1252,29 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         queries.push(q);
       }
     };
-    /*
-    this.displayStat = function (queries, stat, indentLevel) {
-      var query = require("queries").queries[stat.query]();
-      if (query.args_unassigned) {
-        var self = this;
-        var indent = this.getIndent(indentLevel);
-        var entry;
-        var prodcompstring;
-        var q;
-        var qa;
-        
-        var subgroupentry = $("#templates .statsgroupentry").clone();
-        subgroupentry.find(".indent").html(indent);
-        subgroupentry.find(".name").text(stat.name);
-        this.selector.append(subgroupentry);
-        for (var i = 0; i < this.queryArgs.length; i++) {
-          prodcompstring = this.queryArgs[i][0];
-          if (this.queryArgs[i][1]) {
-            prodcompstring += " / " + this.queryArgs[i][1];
-          }
-          entry = $("#templates .statsentry").clone();
-          q = {};
-          $.extend(q, query);
-          qa = {};
-          $.extend(qa, this.queryArgs[i]);
-          q.queryArgs = qa;
-          queries.push(q);
-          q.id += prodcompstring;
-          entry.find(".indent").html(this.getIndent(indentLevel+1));
-          entry.attr("id", this.cleanId(this.reportId + this.queryType + q.id));
-          entry.click(function() { window.open(bugzilla.uiQueryUrl(translateTerms(q["args_" + self.queryType](q.queryArgs)))); });
-          entry.addClass("pagelink");
-          entry.find(".name").text(prodcompstring);
-          entry.find(".value").text("...");
-          this.selector.append(entry);
-        }
-      } else {
-        var self = this;
-        var indent = this.getIndent(indentLevel);
-        var entry = $("#templates .statsentry").clone();
-        queries.push(query);
-        entry.find(".indent").html(indent);
-        entry.attr("id", this.cleanId(this.reportId + this.queryType + query.id));
-        entry.click(function() { window.open(bugzilla.uiQueryUrl(translateTerms(query["args_" + self.queryType](self.queryArgs)))); });
-        entry.addClass("pagelink");
-        entry.find(".name").text(stat.name);
-        entry.find(".value").text("...");
-        this.selector.append(entry);
+
+    this.fullStatsText = function(queryId) {
+      var text = '';
+      for (s in this.statsByProdComp[queryId]) {
+        text += '<a href="' + this.statsByProdComp[queryId][s].url + '" target="_blank">' + s + ': ' + this.statsByProdComp[queryId][s].value + '</a><br/>';
       }
+      return text;
     };
-    */
 
     this.queryDoneCb = function (query, queryType, results) {
       var statValue = results[query.id];
       if (this.statsByProdComp[query.id] === undefined) {
         this.statsByProdComp[query.id] = {};
       }
-      this.statsByProdComp[query.id][query.queryArgs[0]+query.queryArgs[1]] = statValue;
+      var bugUrl = bugzilla.uiQueryUrl(translateTerms(query["args_" + queryType](query.queryArgs)));
+      this.statsByProdComp[query.id][query.queryArgs[0]+query.queryArgs[1]] = {value: statValue, url: bugUrl};
       var total = 0;
       for (s in this.statsByProdComp[query.id]) {
-        total += this.statsByProdComp[query.id][s];
+        total += this.statsByProdComp[query.id][s].value;
       }
-      var valueEntry = $("#" + this.cleanId(this.reportId + this.queryType + query.id)).find(".value");
+      var entry = $("#" + this.cleanId(this.reportId + this.queryType + query.id));
+      entry.attr("title", this.fullStatsText(query.id));
+      var valueEntry = entry.find(".value");
       valueEntry.text(total);
     };
 
