@@ -1255,7 +1255,13 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
 
     this.fullStatsText = function(queryId) {
       var text = '';
+      var entries = [];
       for (s in this.statsByProdComp[queryId]) {
+        entries.push(s);
+      }
+      entries.sort();
+      for (var i = 0; i < entries.length; i++) {
+        s = entries[i];
         text += '<a href="' + this.statsByProdComp[queryId][s].url + '" target="_blank">' + s + ': ' + this.statsByProdComp[queryId][s].value + '</a><br/>';
       }
       return text;
