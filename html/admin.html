@@ -31,9 +31,12 @@
 </div>
 <div class="adminpanel">
   <div class="bolttopleft"></div><div class="bolttopright"></div><div class="boltbottomleft"></div><div class="boltbottomright"></div>
-  <div id="adminteamlist" class="adminlist">
-    <h2>Teams <button class="siteadminbutton adminadd adminbutton nodisplay" type="button" data-dialog="add-team">+</button></h2>
-    <div class="entitylist"></div>
+  <div id="admindivdetails" class="adminlist">
+    <h2>Division Details</h2>
+    <h3>Releases</h3>
+    <div id="releases" class="entitylist"></div>
+    <h3>Teams <button class="siteadminbutton adminadd adminbutton nodisplay" type="button" data-dialog="add-team">+</button></h3>
+    <div id="teams" class="entitylist"></div>
   </div>
 </div>
 </div>
@@ -159,9 +162,23 @@
   </form>
   </div>
 </div>
+<div id="mod-release" class="dialog">
+  <div class="content">
+  <form id="mod-release-form">
+  <p><span id="mod-release-name"></span></p>
+  <input type="text" id="mod-release-query"/><br/>
+  <br/>
+  <input type="button" id="mod-release-cancel"
+         value="Cancel"/>
+  <input type="submit" id="mod-release-submit"
+         value="OK"/>
+  </form>
+  </div>
+</div>
 <div id="errors"></div>
 <div id="templates">
   <div class="normallistentry listentry"><div class="listentrytext"><span class="listentrytextspan"></span></div><div class="listentrybutton nodisplay buttondel"><button class="siteadminbutton adminbutton" type="button">&ndash;</button></div></div>
+  <div class="releaselistentry listentry"><div class="listentrytext"><span class="listentrytextspan listentrytextname"></span><span class="listentrytextspan listentrytextvalue"></span></div><div class="listentrybutton nodisplay buttonmod"><button class="siteadminbutton adminbutton" type="button">...</button></div></div>
   <div class="prodcomplistentry listentry"><div class="listentrytext"><span class="listentrytextspan"></span></div><div class="listentrybutton nodisplay buttondel"><button class="teamadminbutton adminbutton" type="button">&ndash;</button></div></div>
   <div class="memberlistentry listentry"><div class="listentrytext"><span class="listentrytextspan"></span><span class="listentrysiteadminspan nodisplay"> <b>[site admin]</b></span><span class="listentryteamadminspan nodisplay"> <b>[team admin]</b></span></div><div class="listentrybutton nodisplay buttonsiteadmin"><button class="siteadminbutton adminbutton" type="button"></button></div>
   <div class="listentrybutton nodisplay buttonteamadmin"><button class="teamadminbutton adminbutton" type="button"></button></div>

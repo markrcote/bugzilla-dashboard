@@ -601,7 +601,35 @@ Require.modules["app/ui/admin"] = function(exports, require) {
       dialog.fadeOut();
     };
   }
-  
+
+  function modReleaseDialogFunc(divisionId, releaseType, releaseName, currentReleaseValue) {
+    return function() {
+      var dialog = $("#mod-release");
+      $("#mod-release-name").text(releaseName);
+      $("#mod-release-query").attr("value", currentReleaseValue);
+      $("#mod-release form").unbind('submit');
+      $("#mod-release form").submit(modReleaseFunc(dialog, divisionId, releaseType));
+      dialog.fadeIn(
+        function() {
+          dialog.find("input:first").focus();
+        });
+    }
+  }
+
+  function modReleaseFunc(dialog, divisionId, releaseType) {
+    return function(event) {
+      var noneEntry = null;
+      event.preventDefault();
+      var jsonData = {divisions: [{}]};
+      jsonData.divisions[0][releaseType] = $("#mod-release-query").attr("value");
+      
+      currentDivisionId = -1;
+      server.query("PUT", "/division/" + divisionId, function() { selectionChanged(divisionId, -1); },
+          server.authJSON(jsonData));
+      dialog.fadeOut();
+    };
+  }
+
   function newListEntry(parent, entryType, id, text, onclick, templateName) {
     if (!templateName)
       templateName = "normallistentry";
@@ -617,6 +645,25 @@ Require.modules["app/ui/admin"] = function(exports, require) {
     entry.hover(function() { $(entry.find(".listentrybutton")).removeClass("nodisplay"); },
                 function() { $(entry.find(".listentrybutton")).addClass("nodisplay"); });
     $(delbuttondiv.find("button")).click(delEntryDialogFunc(parent, entry, entryType, id));
+    parent.append(entry);
+    return entry;
+  }
+
+  function newReleaseListEntry(parent, entryType, id, name, value, onclick) {
+    var entry = $("#templates .releaselistentry").clone();
+    var entrytext = $(entry.find(".listentrytext"));
+    var modbuttondiv = $(entry.find(".buttonmod"));
+    if (id)
+      entry.attr("id", entryType + id);
+    if (name)
+      entrytext.find(".listentrytextname").text(name);
+    if (value)
+      entrytext.find(".listentrytextvalue").text(value);
+    if (onclick)
+      entrytext.click(onclick);
+    entry.hover(function() { $(entry.find(".listentrybutton")).removeClass("nodisplay"); },
+                function() { $(entry.find(".listentrybutton")).addClass("nodisplay"); });
+    $(modbuttondiv.find("button")).click(modReleaseDialogFunc(id, entryType, name, value));
     parent.append(entry);
     return entry;
   }
@@ -686,10 +733,22 @@ Require.modules["app/ui/admin"] = function(exports, require) {
   }
 
   function divisionLoaded(response) {
-    $("#adminteamlist").removeClass("loading");
+    $("#admindivdetails").removeClass("loading");
+    $("#admindivdetails").find("h2").text(response.divisions[0].name + " Division Details");
+    newReleaseListEntry($("#releases"),
+        "next_prod_rel",
+        response.divisions[0].id,
+        "Next product release: ",
+        response.divisions[0].next_prod_rel);
+    newReleaseListEntry($("#releases"),
+        "next_iterim_rel",
+        response.divisions[0].id,
+        "Next interim release: ",
+        response.divisions[0].next_interim_rel);
+
     response.divisions[0].teams.sort(require("app/ui/sort").sortByKey("name"));
     for (var i = 0; i < response.divisions[0].teams.length; i++) {
-      newListEntry($("#adminteamlist").find(".entitylist"),
+      newListEntry($("#teams"),
                    "team",
                    response.divisions[0].teams[i].id,
                    response.divisions[0].teams[i].name,
@@ -769,8 +828,8 @@ Require.modules["app/ui/admin"] = function(exports, require) {
   function selectionChanged(divisionId, teamId) {
     if (divisionId != -1 && currentDivisionId != divisionId) {
       currentDivisionId = divisionId;
-      $("#adminteamlist").addClass("loading");
-      $("#adminteamlist").find(".entitylist").html("");
+      $("#admindivdetails").addClass("loading");
+      $("#admindivdetails").find(".entitylist").html("");
       server.query("GET", "/division/" + divisionId, divisionLoaded);
       updateSelectedEntity($("#admindivisionlist").find(".listentry"), "division" + divisionId);
     }
@@ -780,7 +839,7 @@ Require.modules["app/ui/admin"] = function(exports, require) {
       $("#adminteamdetails").addClass("loading");
       $("#adminteamdetails").find(".entitylist").html("");
       server.query("GET", "/team/" + teamId, teamLoaded);
-      updateSelectedEntity($("#adminteamlist").find(".listentry"), "team" + teamId);
+      updateSelectedEntity($("#admindivdetails").find(".listentry"), "team" + teamId);
     }
   }
   
@@ -904,6 +963,8 @@ Require.modules["app/ui/admin"] = function(exports, require) {
   });
 
   $("#del-team-cancel").click(function () { $("#del-entry").fadeOut(); });
+
+  $("#mod-release-cancel").click(function () { $("#mod-release").fadeOut(); });
 
   var dashboardCommand = {
       name: "dashboard",
@@ -1338,6 +1399,9 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       }
     ];
     
+    this.topLevelSetup = function() {
+    };
+    
     this.setupReportDisplay = function (selector) {
       this.reportCell = $("#templates td." + (this.detailed ? "detailed" : "") + "reportcell").clone();
       
@@ -1347,18 +1411,9 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       
       this.stats = this.reportCell.find(".stats");
       this.stats.addClass("nodisplay");
-      
+     
       if (this.topLevel) {
-        var interimRelName = $("#templates .statsentry").clone();
-        interimRelName.find(".name").text("Next Interim Release");
-        interimRelName.find(".value").text(require("queries").NEXT_INTERIM_RELEASE);
-        var productRelName = $("#templates .statsentry").clone();
-        productRelName.find(".name").text("Next Product Release");
-        productRelName.find(".value").text(require("queries").NEXT_PRODUCT_RELEASE);
-        var sep = $("#templates .statsgroupsep").clone();
-        this.stats.append(interimRelName);
-        this.stats.append(productRelName);
-        this.stats.append(sep);
+        this.topLevelSetup();
       }
       
       selector.append(this.reportCell);
@@ -1559,6 +1614,19 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         this.name_entry.click(function() { window.open(require("app/ui/hash").divisionToHash(self.id)); });
       this.displayQueries(selector, forceUpdate);
     };
+
+    this.topLevelSetup = function() {
+      var interimRelName = $("#templates .statsentry").clone();
+      interimRelName.find(".name").text("Next Interim Release");
+      interimRelName.find(".value").text(this.team.next_interim_rel);
+      var productRelName = $("#templates .statsentry").clone();
+      productRelName.find(".name").text("Next Product Release");
+      productRelName.find(".value").text(this.team.next_prod_rel);
+      var sep = $("#templates .statsgroupsep").clone();
+      this.stats.append(interimRelName);
+      this.stats.append(productRelName);
+      this.stats.append(sep);
+    };
   }
   TeamReport.prototype = new Report;
 
@@ -1626,7 +1694,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     fillRow(row, reportCount);
 }
 
-  function teamList(selector, template, forceUpdate, teams) {
+  function teamList(selector, template, forceUpdate, division, teams) {
     teamReports = [];
     var reportCount = 0;
     var row = null;
@@ -1645,7 +1713,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     fillRow(row, reportCount);
   }
 
-  function userList(selector, template, forceUpdate, users) {
+  function userList(selector, template, forceUpdate, division, team, users) {
     userReports = [];
     var reportCount = 0;
     var row = null;
@@ -1699,16 +1767,18 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       teamReports.push(report);
       report.update(detailedReportContainer, forceUpdate);
       if ("teams" in division) {
-        teamList($("#reports"), teamListTemplate, forceUpdate, division.teams);
+        teamList($("#reports"), teamListTemplate, forceUpdate, division, division.teams);
         report.reportCell.attr("colspan", REPORTS_PER_ROW);
       }
     } else if (who.team != -1) {
       teamReports = [];
       var divisions = require("teams").get();
       var team = null;
+      var division = null;
       for (i = 0; i < divisions.length; i++) {
         for (j = 0; j < divisions[i].teams.length; j++) {
           if (divisions[i].teams[j].id == who.team) {
+            division = divisions[i];
             team = divisions[i].teams[j];
             break;
           }
@@ -1724,7 +1794,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       teamReports.push(report);
       report.update(detailedReportContainer, forceUpdate);
       if ("members" in team) {
-        userList($("#reports"), memberListTemplate, forceUpdate, team.members);
+        userList($("#reports"), memberListTemplate, forceUpdate, division, team, team.members);
         report.reportCell.attr("colspan", REPORTS_PER_ROW);
       }
     } else if (who.user != -1) {

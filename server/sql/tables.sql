@@ -9,7 +9,9 @@ CREATE TABLE queries (
 CREATE TABLE divisions (
     id INT AUTO_INCREMENT,
     PRIMARY KEY (id),
-    name TEXT COLLATE utf8_bin
+    name TEXT COLLATE utf8_bin,
+    next_prod_rel TEXT COLLATE utf8_bin,
+    next_iterim_rel TEXT COLLATE utf8_bin
 );
 
 CREATE TABLE teams (
