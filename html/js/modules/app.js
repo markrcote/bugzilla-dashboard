@@ -1056,7 +1056,7 @@ Require.modules["app/ui/mostactive"] = function(exports, require) {
     }
   }
   
-  exports.get = function get(cb, prodcomps) {
+  exports.get = function get(cb, queries, prodcomps) {
     bugs = [];
     queryCount = 0;
     callback = cb;
@@ -1064,7 +1064,7 @@ Require.modules["app/ui/mostactive"] = function(exports, require) {
     var query, args, newTerms;
     for (var i = 0; i < prodcomps.length; i++) {
       queryCount++;
-      query = require("queries").queries["changed_last_week"]();
+      query = queries["changed_last_week"]();
       args = query.args_unassigned(prodcomps[i]);
       args["include_fields"] = "id,summary,comments,history,status,priority,severity,last_change_time";
       newTerms = translateTerms(args);
@@ -1161,15 +1161,6 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       runQueriesFunc(self)();
       window.setInterval(runQueriesFunc(self), 5*60*1000);
     };
-
-    if (this.queries.length == 0) {
-      this.queries = [];
-      for (q in require("queries").queries) {
-        var query = require("queries").queries[q]();
-        this.queries.push(query);
-      }
-    }
-    
   }
   
   
@@ -1178,8 +1169,9 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
    * Displays (optionally grouped) queries by adding "statsentry" templates onto the
    * given selector.  When the associated query finishes, populates the associated value.
    */
-  function ReportPanel(selector, displayedQueries, queryArgs, queryType, reportId) {
+  function ReportPanel(selector, queries, displayedQueries, queryArgs, queryType, reportId) {
     this.selector = selector;
+    this.queries = queries;
     this.displayedQueries = displayedQueries;
     this.queryArgs = queryArgs;
     this.queryType = queryType;
@@ -1220,7 +1212,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       var self = this;
       var indent = this.getIndent(indentLevel);
       var entry = $("#templates .statsentry").clone();
-      var query = require("queries").queries[stat.query]();
+      var query = this.queries[stat.query]();
       query.queryArgs = query["args_" + this.queryType](this.queryArgs);
       queries.push(query);
       entry.find(".indent").html(indent);
@@ -1270,14 +1262,14 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     }
   }
   
-  function ToDoReportPanel(selector, displayedQueries, prodcomps, queryType, reportId) {
-    ReportPanel.call(this, selector, displayedQueries, prodcomps, queryType, reportId);
+  function ToDoReportPanel(selector, queries, displayedQueries, prodcomps, queryType, reportId) {
+    ReportPanel.call(this, selector, queries, displayedQueries, prodcomps, queryType, reportId);
 
     this.classid = 'ToDoReportPanel';
     this.statsByProdComp = {};
 
     this.displayStat = function (queries, stat, indentLevel) {
-      var query = require("queries").queries[stat.query]();
+      var query = this.queries[stat.query]();
       var self = this;
       var indent = this.getIndent(indentLevel);
       var entry;
@@ -1355,10 +1347,11 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
   /**
    * Report: Creates a panel with statistics.  If detailed, adds to-do and most-active panels.
    */
-  function Report(reportType, id, name, detailed, topLevel) {
+  function Report(reportType, id, name, division, detailed, topLevel) {
     this.reportType = reportType;
     this.id = id;
     this.name = name;
+    this.division = division;
     this.detailed = detailed;
     this.topLevel = topLevel;
     this.reportCell = null;
@@ -1508,7 +1501,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     this.loadMostActive = function() {
       var self = this;
       require("app/ui/mostactive").get(function(bugs) { self.mostActiveLoaded(bugs); },
-          this.prodcomps());
+          this.queries, this.prodcomps());
     };
     
     this.allDoneCb = function() {
@@ -1540,7 +1533,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       this.selector = selector;
       var self = this;
       
-      this.queryPanel = new ReportPanel(this.stats, this.displayedQueries, this.usernames(),
+      this.queryPanel = new ReportPanel(this.stats, this.queries, this.displayedQueries, this.usernames(),
           "assigned", this.reportType + this.id);
       this.queryPanel.classid = this.id + ' regular';
       
@@ -1557,21 +1550,25 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
           this.mostActive.find(".name").removeClass("loading");
           this.allDoneToDoCb();
         } else {
-          this.toDoQueryPanel = new ToDoReportPanel(this.stuffToDo.find(".stats"), this.stuffToDoQueries,
+          this.toDoQueryPanel = new ToDoReportPanel(this.stuffToDo.find(".stats"), this.queries, this.stuffToDoQueries,
               prodcomps, "unassigned", this.reportType + this.id);
           this.toDoQueryPanel.displayQueries(forceUpdate, function() { self.allDoneToDoCb(); });
         }
       }
     };
+    
+    this.init = function() {
+      this.queries = require("queries").queries(this.division, this.usernames(), this.prodcomps());
+    };
   }
   
   
-  function TeamReport(teamId, team, detailed, topLevel, groupType) {
+  function TeamReport(teamId, division, team, detailed, topLevel, groupType) {
     if (groupType)
       this.groupType = groupType;
     else
       this.groupType = "team";
-    Report.call(this, this.groupType, teamId, team.name, detailed, topLevel);
+    Report.call(this, this.groupType, teamId, team.name, division, detailed, topLevel);
     this.team = team;
     this.indicatorLoaders = [];
     this.detailed = detailed;
@@ -1579,10 +1576,10 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     this.usernames = function () {
       var i;
       var l = [];
-      if ("members" in this.team) {
+      if (this.team.members !== undefined) {
         l = l.concat(this.team.members.map(function(x) { return x.bugemail; }));
       }
-      if ("teams" in this.team) {
+      if (this.team.teams !== undefined) {
         for (i = 0; i < this.team.teams.length; i++) {
           l = l.concat(this.team.teams[i].members.map(function(x) { return x.bugemail; }));
         }
@@ -1594,10 +1591,10 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       var teams = [this.team];
       var prodcomps = [];
       var i;
-      if ("teams" in this.team)
+      if (this.team.teams !== undefined)
         teams = teams.concat(this.team.teams);
       for (i = 0; i < teams.length; i++) {
-        if ("prodcomps" in teams[i])
+        if (teams[i].prodcomps !== undefined)
           prodcomps = prodcomps.concat(teams[i].prodcomps.map(function(x) { return [x.product, x.component]; }));
       }
       return prodcomps;
@@ -1630,9 +1627,10 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
   }
   TeamReport.prototype = new Report;
 
-  
-  function UserReport(userId, user, detailed) {
-    Report.call(this, "user", userId, user.nick ? user.nick : user.name, detailed, false);
+
+  function UserReport(userId, user, division, team, detailed) {
+    Report.call(this, "user", userId, user.nick ? user.nick : user.name, division, detailed, false);
+    this.team = team;
     this.user = user;
     
     this.usernames = function () {
@@ -1678,7 +1676,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
   
   function divisionList(selector, template, forceUpdate) {
     var divisions = require("app/teams").get();
-    teamReports = [];
+    divisionReports = [];
     var reportCount = 0;
     var row = null;
     for (d in divisions) {
@@ -1686,9 +1684,9 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         row = template.clone();
         selector.append(row);
       }
-      var divisionId = divisions[d].id;
-      var report = new TeamReport(divisionId, divisions[d], false, true, "division");
-      teamReports.push(report);
+      var report = new TeamReport(divisions[d].id, divisions[d], divisions[d], false, true, "division");
+      report.init();
+      divisionReports.push(report);
       report.update(row, forceUpdate);
     }
     fillRow(row, reportCount);
@@ -1706,7 +1704,8 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         selector.append(row);
       }
       var teamId = teams[t].id;
-      var report = new TeamReport(teamId, teams[t], false, false);
+      var report = new TeamReport(teamId, division, teams[t], false, false);
+      report.init();
       teamReports.push(report);
       report.update(row, forceUpdate);
     }
@@ -1724,7 +1723,8 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         selector.append(row);
       }
       var userId = users[u].id;
-      var report = new UserReport(userId, users[u], false);
+      var report = new UserReport(userId, users[u], division, false);
+      report.init();
       userReports.push(report);
       report.update(row, forceUpdate);
     }
@@ -1763,7 +1763,8 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       if (!division) {
         return;  // FIXME: proper error
       }
-      var report = new TeamReport(who.division, division, true, false, "division");
+      var report = new TeamReport(who.division, division, division, true, false, "division");
+      report.init();
       teamReports.push(report);
       report.update(detailedReportContainer, forceUpdate);
       if ("teams" in division) {
@@ -1789,7 +1790,8 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       if (!team) {
         return;  // FIXME: proper error
       }
-      var report = new TeamReport(who.team, team, true, false);
+      var report = new TeamReport(who.team, division, team, true, false);
+      report.init();
       var teamCount = 0;
       teamReports.push(report);
       report.update(detailedReportContainer, forceUpdate);
@@ -1818,6 +1820,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       if (!user)
         return;
       var report = new UserReport(who.user, user, true);
+      report.init();
       userReports.push(report);
       report.update(detailedReportContainer, forceUpdate);
     } else {
