@@ -1098,7 +1098,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       }
       var self = this;
       runQueriesFunc(self)();
-      //window.setInterval(runQueriesFunc(self), 20000);
+      window.setInterval(runQueriesFunc(self), 5*60*1000);
     };
 
     if (this.queries.length == 0) {
@@ -1466,10 +1466,7 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         this.mostActive.append(table);
       }
       var self = this;
-      function foo() {
-        self.loadMostActive();
-      }
-      window.setTimeout(foo, 20000);
+      window.setTimeout(function() { self.loadMostActive(); }, 5*60*1000);
     }
     
     this.loadMostActive = function() {
