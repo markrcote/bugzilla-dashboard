@@ -5,15 +5,19 @@ Require.modules["date-utils"] = function(exports) {
   };
 
   // Taken from MDC @ Core_JavaScript_1.5_Reference/Objects/Date.
-  exports.dateToISO8601 = function dateToISO8601(d) {
+  exports.dateToISO8601 = function dateToISO8601(d, dateOnly) {
     function pad(n) { return n < 10 ? '0' + n : n; }
     
-    return (d.getUTCFullYear() + '-' +
+    var s = d.getUTCFullYear() + '-' +
             pad(d.getUTCMonth() + 1) + '-' +
-            pad(d.getUTCDate()) + 'T' + 
+            pad(d.getUTCDate());
+    if (!dateOnly) {
+      s += 'T' + 
             pad(d.getUTCHours()) + ':' +
             pad(d.getUTCMinutes()) + ':' +
-            pad(d.getUTCSeconds()) + 'Z');
+            pad(d.getUTCSeconds()) + 'Z';
+    }
+    return s;
   };
 
   // Taken from http://delete.me.uk/2005/03/iso8601.html
@@ -74,8 +78,8 @@ Require.modules["date-utils"] = function(exports) {
       day_diff < 31 && Math.ceil( day_diff / 7 ) + " weeks ago";
   };
 
-  exports.timeAgo = function timeAgo(ms) {
+  exports.timeAgo = function timeAgo(ms, dateOnly) {
     var then = new Date(exports.now() - ms);
-    return exports.dateToISO8601(then);
+    return exports.dateToISO8601(then, dateOnly);
   };
 };

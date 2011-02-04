@@ -639,40 +639,27 @@ Require.modules["app/ui/admin"] = function(exports, require) {
       $($(entry.find(".buttondel")).find("button")).removeClass("teamadminbutton nodisplay");
     }
     
+    var onMakeAdminDone = function() {
+      if (currentTeamId == member.team_id) {
+        currentTeamId = -1; 
+        selectionChanged(-1, member.team_id);
+        }
+      };
+    
     if (currentLogin.siteAdmin || currentLogin.teamAdmins.indexOf(currentTeamId) >= 0) {
       $(entry.find(".buttonsiteadmin")).find("button").text(member.site_admin ? "remove site admin" : "make site admin");
       $(entry.find(".buttonsiteadmin")).find("button").click(function() {
-        server.query("PUT", "/user/" + member.user_id, function() {
-          if (currentTeamId == member.team_id) {
-            currentTeamId = -1; 
-            selectionChanged(-1, member.team_id);
-            }
-          },
+        server.query("PUT", "/user/" + member.user_id, onMakeAdminDone,
           server.authJSON({users: [{site_admin: !member.site_admin}]}));
         }
       );
 
       $(entry.find(".buttonteamadmin")).find("button").text(member.team_admin ? "remove team admin" : "make team admin");
       $(entry.find(".buttonteamadmin")).find("button").click(function() {
-        server.query("PUT", "/member/" + member.id, function() {
-          if (currentTeamId == member.team_id) {
-            currentTeamId = -1; 
-            selectionChanged(-1, member.team_id);
-            }
-          },
+        server.query("PUT", "/member/" + member.id, onMakeAdminDone,
           server.authJSON({members: [{team_admin: !member.team_admin}]}));
         }
       );
-
-      // FIXME: REMOVE
-      entry.hover(function() {
-                    $(entry.find(".buttonsiteadmin")).removeClass("nodisplay");
-                    $(entry.find(".buttonteamadmin")).removeClass("nodisplay");
-                  },
-                  function() {
-                    $(entry.find(".buttonsiteadmin")).addClass("nodisplay");
-                    $(entry.find(".buttonteamadmin")).addClass("nodisplay");
-                  });
     }
     return entry;
   }
@@ -972,6 +959,7 @@ Require.modules["app/ui/mostactive"] = function(exports, require) {
   var afterdate;
   var callback = null;
   var bugs = [];
+  var queryCount = 0;
 
   function translateTerms(args) {
     var newTerms = {};
@@ -996,25 +984,35 @@ Require.modules["app/ui/mostactive"] = function(exports, require) {
       }
       response.bugs[i].comments = [];
       response.bugs[i].history = [];
+      bugs.push(response.bugs[i]);
     }
     
-    response.bugs.sort(function(a, b) {return b.change_count - a.change_count;});
-    if (callback)
-      callback(response.bugs);
+    queryCount--;
+    if (queryCount == 0) {
+      bugs.sort(function(a, b) {return b.change_count - a.change_count;});
+      if (callback)
+        callback(bugs);
+    }
   }
   
   exports.get = function get(cb, prodcomps) {
+    bugs = [];
+    queryCount = 0;
     callback = cb;
     afterdate = require("date-utils").timeAgo(MS_PER_DAY * 7);
-    var query = require("queries").queries["changed_last_week"]();
-    var args = query.args_unassigned(prodcomps);
-    args["include_fields"] = "id,summary,comments,history,status,priority,severity,last_change_time";
-    var newTerms = translateTerms(args);
-    
-    xhrQueue.enqueue(
-      function() {
-        return bugzilla.search(newTerms, onLoad);
-      });
+    var query, args, newTerms;
+    for (var i = 0; i < prodcomps.length; i++) {
+      queryCount++;
+      query = require("queries").queries["changed_last_week"]();
+      args = query.args_unassigned(prodcomps[i]);
+      args["include_fields"] = "id,summary,comments,history,status,priority,severity,last_change_time";
+      newTerms = translateTerms(args);
+      
+      xhrQueue.enqueue(
+        function() {
+          return bugzilla.search(newTerms, onLoad);
+        });
+    }
   };
   
 }
@@ -1033,44 +1031,44 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
    * QueryRunner: runs a number of queries with arguments.
    * Calls queryDoneCb() after each query finishes, and allDoneCb() after all finish.
    */
-  function QueryRunner(forceUpdate, queryArgs, queryDoneCb, allDoneCb, queries, queryType) {
+  function QueryRunner(forceUpdate, queryDoneCb, allDoneCb, queries, queryType) {
     // FIXME: Could probably split this into another object per query.
-    this.queryArgs = queryArgs;
     this.queryDoneCb = queryDoneCb;
     this.allDoneCb = allDoneCb;
     this.queryCount = 0;
     this.results = {};
+    this.queries = queries;
     
     this.queryDone = function(query) {
       this.queryDoneCb(query, queryType, this.results);
       this.decQueryCount();
-    }
+    };
     
     this.decQueryCount = function() {
       if (--this.queryCount == 0)
         this.allDoneCb(this.results);
-    }
+    };
 
     this.parseResults = function(query, response) {
       this.results[query.id] = response.data;
-    }
+    };
     
     this.getStat = function(forceUpdate, query, getStatCb) {
       this.results[query.id] = 0;
       
-      if (this.queryArgs.length == 0) {
+      if (!query.queryArgs || query.queryArgs.length == 0) {
         this.queryDone(query);
         return;
       }
 
-      var args = query["args_" + queryType](this.queryArgs);
+      var args = query["args_" + queryType](query.queryArgs);
       if (args === null) {
         this.results[query.id] = "err";
         this.queryDone(query); 
         return;
       }
       var newTerms = translateTerms(args);
-      
+        
       var self = this;
       xhrQueue.enqueue(
         function() {
@@ -1081,24 +1079,36 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
               self.queryDone(query);
             });
         });
-    }
-    
-    if (!queries) {
-      queries = [];
+    };
+
+    this.go = function() {
+      var runQueriesFunc = function(self) {
+        return function () {
+          self.queryCount = self.queries.length;
+          var count = 0;
+          for (var q = 0; q < self.queries.length; q++) {
+            count++;
+            self.getStat(forceUpdate, self.queries[q],
+                function(query, value) {
+                  self.queryDone(query, value);
+                }
+              );
+          }
+        };
+      }
+      var self = this;
+      runQueriesFunc(self)();
+      //window.setInterval(runQueriesFunc(self), 20000);
+    };
+
+    if (this.queries.length == 0) {
+      this.queries = [];
       for (q in require("queries").queries) {
         var query = require("queries").queries[q]();
-        queries.push(query);
+        this.queries.push(query);
       }
     }
-    this.queryCount = queries.length;
-    var self = this;
-    for (q in queries) {
-      this.getStat(forceUpdate, queries[q],
-          function(query, value) {
-            self.queryDone(query, value);
-          }
-        );
-    }
+    
   }
   
   
@@ -1113,6 +1123,8 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     this.queryArgs = queryArgs;
     this.queryType = queryType;
     this.reportId = reportId;
+    this.classid = 'ReportPanel';
+    this.statsByProdComp = {};
 
     this.getIndent = function (indentLevel) {
       var indent = "";
@@ -1148,10 +1160,11 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       var indent = this.getIndent(indentLevel);
       var entry = $("#templates .statsentry").clone();
       var query = require("queries").queries[stat.query]();
+      query.queryArgs = query["args_" + this.queryType](this.queryArgs);
       queries.push(query);
       entry.find(".indent").html(indent);
-      entry.click(function() { window.open(bugzilla.uiQueryUrl(translateTerms(query["args_" + this.queryType](this.queryArgs)))); });
       entry.attr("id", this.cleanId(this.reportId + this.queryType + query.id));
+      entry.click(function() { window.open(bugzilla.uiQueryUrl(translateTerms(query.queryArgs))); });
       entry.addClass("pagelink");
       entry.find(".name").text(stat.name);
       entry.find(".value").text("...");
@@ -1164,9 +1177,14 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     
     this.queryDoneCb = function (query, queryType, results) {
       var total = results[query.id];
-      $("#" + this.cleanId(this.reportId + this.queryType + query.id)).find(".value").text(total);
+      var valueEntry = $("#" + this.cleanId(this.reportId + this.queryType + query.id)).find(".value");
+      valueEntry.text(total);
     };
 
+    this.allDoneCb = function() {
+      this.callback();
+    };
+    
     this.displayQueries = function (forceUpdate, callback) {
       this.callback = callback;
       var i;
@@ -1184,11 +1202,113 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
       }
       
       this.QueryRunner = new QueryRunner(
-          forceUpdate, this.queryArgs,
+          forceUpdate,
           function(query, queryType, value) { self.queryDoneCb(query, queryType, value); },
-          function() { self.callback(); }, queries, this.queryType);
+          function() { self.allDoneCb(); }, queries, this.queryType);
+      this.QueryRunner.go();
     }
-  };
+  }
+  
+  function ToDoReportPanel(selector, displayedQueries, prodcomps, queryType, reportId) {
+    ReportPanel.call(this, selector, displayedQueries, prodcomps, queryType, reportId);
+
+    this.classid = 'ToDoReportPanel';
+    this.statsByProdComp = {};
+
+    this.displayStat = function (queries, stat, indentLevel) {
+      var query = require("queries").queries[stat.query]();
+      var self = this;
+      var indent = this.getIndent(indentLevel);
+      var entry;
+      var q;
+      var qa;
+
+      entry = $("#templates .statsentry").clone();
+      entry.find(".indent").html(this.getIndent(indentLevel));
+      entry.attr("id", this.cleanId(this.reportId + this.queryType + query.id));
+      //entry.click(function() { window.open(bugzilla.uiQueryUrl(translateTerms(q["args_" + self.queryType](q.queryArgs)))); });
+      //entry.addClass("pagelink");
+      entry.find(".name").text(stat.name);
+      entry.find(".value").text("...");
+      this.selector.append(entry);
+      
+      for (var i = 0; i < this.queryArgs.length; i++) {
+        q = {};
+        $.extend(q, query);
+        qa = {};
+        $.extend(qa, this.queryArgs[i]);
+        q.queryArgs = qa;
+        queries.push(q);
+      }
+    };
+    /*
+    this.displayStat = function (queries, stat, indentLevel) {
+      var query = require("queries").queries[stat.query]();
+      if (query.args_unassigned) {
+        var self = this;
+        var indent = this.getIndent(indentLevel);
+        var entry;
+        var prodcompstring;
+        var q;
+        var qa;
+        
+        var subgroupentry = $("#templates .statsgroupentry").clone();
+        subgroupentry.find(".indent").html(indent);
+        subgroupentry.find(".name").text(stat.name);
+        this.selector.append(subgroupentry);
+        for (var i = 0; i < this.queryArgs.length; i++) {
+          prodcompstring = this.queryArgs[i][0];
+          if (this.queryArgs[i][1]) {
+            prodcompstring += " / " + this.queryArgs[i][1];
+          }
+          entry = $("#templates .statsentry").clone();
+          q = {};
+          $.extend(q, query);
+          qa = {};
+          $.extend(qa, this.queryArgs[i]);
+          q.queryArgs = qa;
+          queries.push(q);
+          q.id += prodcompstring;
+          entry.find(".indent").html(this.getIndent(indentLevel+1));
+          entry.attr("id", this.cleanId(this.reportId + this.queryType + q.id));
+          entry.click(function() { window.open(bugzilla.uiQueryUrl(translateTerms(q["args_" + self.queryType](q.queryArgs)))); });
+          entry.addClass("pagelink");
+          entry.find(".name").text(prodcompstring);
+          entry.find(".value").text("...");
+          this.selector.append(entry);
+        }
+      } else {
+        var self = this;
+        var indent = this.getIndent(indentLevel);
+        var entry = $("#templates .statsentry").clone();
+        queries.push(query);
+        entry.find(".indent").html(indent);
+        entry.attr("id", this.cleanId(this.reportId + this.queryType + query.id));
+        entry.click(function() { window.open(bugzilla.uiQueryUrl(translateTerms(query["args_" + self.queryType](self.queryArgs)))); });
+        entry.addClass("pagelink");
+        entry.find(".name").text(stat.name);
+        entry.find(".value").text("...");
+        this.selector.append(entry);
+      }
+    };
+    */
+
+    this.queryDoneCb = function (query, queryType, results) {
+      var statValue = results[query.id];
+      if (this.statsByProdComp[query.id] === undefined) {
+        this.statsByProdComp[query.id] = {};
+      }
+      this.statsByProdComp[query.id][query.queryArgs[0]+query.queryArgs[1]] = statValue;
+      var total = 0;
+      for (s in this.statsByProdComp[query.id]) {
+        total += this.statsByProdComp[query.id][s];
+      }
+      var valueEntry = $("#" + this.cleanId(this.reportId + this.queryType + query.id)).find(".value");
+      valueEntry.text(total);
+    };
+
+  }
+  ToDoReportPanel.prototype = new ReportPanel;
   
   /**
    * Report: Creates a panel with statistics.  If detailed, adds to-do and most-active panels.
@@ -1202,6 +1322,9 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     this.reportCell = null;
     this.stuffToDo = null;
     this.mostActive = null;
+    this.allDoneOnce = false;
+    this.allToDoDoneOnce = false;
+    this.allDoneMostActiveOnce = false;
     
     this.displayedQueries = [ 
       { type: "group", name: "Blockers", members: [                       
@@ -1328,47 +1451,83 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     }
     
     this.mostActiveLoaded = function(most_active) {
+      $("#mostactivebugs").remove();
       var table = this.showBugs(most_active.slice(0, 10));
-      table.addClass("nodisplay");
-      this.mostActive.append(table);
-      this.mostActive.find(".name").removeClass("loading");
-      table.css("visibility", "visible").hide().fadeIn("slow");
-      table.removeClass("nodisplay");
-      table.fadeIn();
+      table.attr("id", "mostactivebugs");
+      if (!this.allDoneMostActiveOnce) {
+        this.allDoneMostActiveOnce = true;
+        table.addClass("nodisplay");
+        this.mostActive.append(table);
+        this.mostActive.find(".name").removeClass("loading");
+        table.css("visibility", "visible").hide().fadeIn("slow");
+        table.removeClass("nodisplay");
+        table.fadeIn();
+      } else {
+        this.mostActive.append(table);
+      }
+      var self = this;
+      function foo() {
+        self.loadMostActive();
+      }
+      window.setTimeout(foo, 20000);
     }
     
+    this.loadMostActive = function() {
+      var self = this;
+      require("app/ui/mostactive").get(function(bugs) { self.mostActiveLoaded(bugs); },
+          this.prodcomps());
+    };
+    
     this.allDoneCb = function() {
+      if (this.allDoneOnce)
+        return;
+      this.allDoneOnce = true;
       this.name_entry.removeClass("loading");
       this.reportCell.find(".stats").css("visibility", "visible").hide().fadeIn("slow");
       this.reportCell.find(".stats").removeClass("nodisplay");
       this.reportCell.find(".stats").fadeIn();
-      var self = this;
-      if (this.detailed) {
-        require("app/ui/mostactive").get(function(bugs) { self.mostActiveLoaded(bugs); },
-            this.prodcomps());
+      if (this.detailed && this.prodcomps() && this.prodcomps().length != 0) {
+        this.loadMostActive();
       }
     };
 
     this.allDoneToDoCb = function() {
+      if (this.allToDoDoneOnce)
+        return;
+      this.allToDoDoneOnce = true;
       this.stuffToDo.find(".name").removeClass("loading");
+      /*
       this.stuffToDo.find(".stats").css('visibility','visible').hide().fadeIn('slow');
       this.stuffToDo.find(".stats").removeClass("nodisplay");
       this.stuffToDo.find(".stats").fadeIn();
+      */
     };
 
     this.displayQueries = function (selector, forceUpdate) {
       this.selector = selector;
       var self = this;
       
-      var queryPanel = new ReportPanel(this.stats, this.displayedQueries, this.usernames(),
+      this.queryPanel = new ReportPanel(this.stats, this.displayedQueries, this.usernames(),
           "assigned", this.reportType + this.id);
+      this.queryPanel.classid = this.id + ' regular';
       
-      queryPanel.displayQueries(forceUpdate, function() { self.allDoneCb(); });
+      this.queryPanel.displayQueries(forceUpdate, function() { self.allDoneCb(); });
       
       if (this.detailed) {
-        var toDoQueryPanel = new ReportPanel(this.stuffToDo.find(".stats"), this.stuffToDoQueries,
-            this.prodcomps(), "unassigned", this.reportType + this.id);
-        toDoQueryPanel.displayQueries(forceUpdate, function() { self.allDoneToDoCb(); });
+        var prodcomps = this.prodcomps();
+        if (!prodcomps || prodcomps.length == 0) {
+          var entry = $("#templates .statsmessage").clone();
+          entry.find(".value").text("No products/components defined for this team");
+          this.stuffToDo.find(".stats").append(entry);
+          var entry2 = entry.clone();
+          this.mostActive.append(entry2);
+          this.mostActive.find(".name").removeClass("loading");
+          this.allDoneToDoCb();
+        } else {
+          this.toDoQueryPanel = new ToDoReportPanel(this.stuffToDo.find(".stats"), this.stuffToDoQueries,
+              prodcomps, "unassigned", this.reportType + this.id);
+          this.toDoQueryPanel.displayQueries(forceUpdate, function() { self.allDoneToDoCb(); });
+        }
       }
     };
   }
@@ -1643,10 +1802,18 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
     }
   };
 
+  var adminCommand = {
+      name: "admin-page",
+      execute: function execute() {
+        window.open("admin.html");  
+      }
+    };
+
   exports.init = function init() {
     require("app/commands").register(refreshCommand);
     require("app/commands").register(myStatsCommand);
     require("app/commands").register(topCommand);
+    require("app/commands").register(adminCommand);
     require("app/who").whenChanged(
       function changeSearchCriteria(username) {
         var user = require("app/login").get();

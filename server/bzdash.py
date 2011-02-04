@@ -9,8 +9,6 @@ import bugcache
 
 BASE_BZAPI_URL = 'https://api-dev.bugzilla.mozilla.org/latest'
 
-bc = bugcache.BugCache(config.db, BASE_BZAPI_URL)
-
 urls = (
     '/test/', 'test',
     '/bugcache(.*)', 'bugcache_handler',
@@ -34,7 +32,9 @@ class Log(object):
         self.f.write(s + '\n')
         self.f.flush()
         
-#log = Log()
+log = Log()
+bc = bugcache.BugCache(config.db, BASE_BZAPI_URL, log)
+
 
 app = web.application(urls, globals())
 db = config.db

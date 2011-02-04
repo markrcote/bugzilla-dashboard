@@ -36,35 +36,10 @@ Require.modules["queries"] = function(exports, require) {
     return args;
   }
 
-  function addProdCompQuery(args, prodcomps) {
-    var fullProducts = [];
-    var products = [];
-    var components = [];
-    var i;
-    for (i = 0; i < prodcomps.length; i++) {
-      if (!prodcomps[i][1]) {
-        fullProducts.push(prodcomps[i][0]);
-      }
-    }
-    for (i = 0; i < prodcomps.length; i++) {
-      if (fullProducts.indexOf(prodcomps[i][0]) != -1)
-        continue;
-      if (!(prodcomps[i][0] in products)) {
-        products.push(prodcomps[i][0]);
-      }        
-      if (prodcomps[i][1] && !(prodcomps[i][1] in components)) {
-        components.push(prodcomps[i][1]);
-      }
-    }
-    if (products.length || fullProducts.length) {
-      if (!("product" in args))
-        args["product"] = [];
-      args["product"] = args["product"].concat(fullProducts, products);
-    }
-    if (components.length) {
-      if (!("component" in args))
-        args["component"] = [];
-      args["component"] = args["component"].concat(components);
+  function addProdCompQuery(args, prodcomp) {
+    args["product"] = prodcomp[0];
+    if (prodcomp[1]) {
+        args["component"] = prodcomp[1];
     }
     return args;
   }
@@ -145,9 +120,9 @@ Require.modules["queries"] = function(exports, require) {
         args_assigned: function(usernames) {
           return addUserAssignedQuery(args(), 2, usernames);
         },
-        args_unassigned: function(prodcomps) {
-          var a = addUserAssignedQuery(args(), 2, nobody(prodcomps));
-          return addProdCompQuery(a, prodcomps);
+        args_unassigned: function(prodcomp) {
+          var a = addUserAssignedQuery(args(), 2, nobody(prodcomp));
+          return addProdCompQuery(a, prodcomp);
         }
       };
     },
@@ -204,7 +179,7 @@ Require.modules["queries"] = function(exports, require) {
           changed_field: 'resolution',
           changed_field_to: 'FIXED',
           changed_before: 'Now',
-          changed_after: require("date-utils").timeAgo(MS_PER_DAY * 30)
+          changed_after: require("date-utils").timeAgo(MS_PER_DAY * 30, true)
         };
         return addBlockerQuery(a, 0);
       }
@@ -226,7 +201,7 @@ Require.modules["queries"] = function(exports, require) {
           changed_field: 'resolution',
           changed_field_to: 'FIXED',
           changed_before: 'Now',
-          changed_after: require("date-utils").timeAgo(MS_PER_DAY * 30),
+          changed_after: require("date-utils").timeAgo(MS_PER_DAY * 30, true),
           field0_HYPH_0_HYPH_0: 'cf_blocking_' + productRel,
           type0_HYPH_0_HYPH_0: 'notsubstring',
           value0_HYPH_0_HYPH_0: 'final',
@@ -364,9 +339,9 @@ Require.modules["queries"] = function(exports, require) {
       return {
         id: 'topcrash',
         name: 'Top crashers',
-        args_unassigned: function(prodcomps) {
-          var a = addUserAssignedQuery(args(), 1, nobody(prodcomps));
-          return addProdCompQuery(a, prodcomps);
+        args_unassigned: function(prodcomp) {
+          var a = addUserAssignedQuery(args(), 1, nobody(prodcomp));
+          return addProdCompQuery(a, prodcomp);
         }
       };
     },
