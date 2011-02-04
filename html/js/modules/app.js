@@ -1267,7 +1267,11 @@ Require.modules["app/ui/dashboard"] = function(exports, require) {
         this.statsByProdComp[query.id] = {};
       }
       var bugUrl = bugzilla.uiQueryUrl(translateTerms(query["args_" + queryType](query.queryArgs)));
-      this.statsByProdComp[query.id][query.queryArgs[0]+query.queryArgs[1]] = {value: statValue, url: bugUrl};
+      var argString = query.queryArgs[0];
+      if (query.queryArgs[1]) {
+        argString += " | " + query.queryArgs[1]
+      }
+      this.statsByProdComp[query.id][argString] = {value: statValue, url: bugUrl};
       var total = 0;
       for (s in this.statsByProdComp[query.id]) {
         total += this.statsByProdComp[query.id][s].value;
