@@ -574,10 +574,10 @@ Require.modules["app/ui/admin"] = function(exports, require) {
     return function() { selectionChanged(divId, teamId); };
   }
 
-  function delEntryDialogFunc(parent, entry, entryType, id) {
+  function delEntryDialogFunc(parent, entry, entryType, entryTypeName, id) {
     return function() {
       var dialog = $("#del-entry");
-      $(dialog.find("#del-entry-type")).text(entryType);
+      $(dialog.find("#del-entry-type")).text(entryTypeName);
       $(dialog.find("#del-entry-name")).text($(entry.find(".listentrytextspan")).text());
       $("#del-entry form").unbind('submit');
       $("#del-entry form").submit(delEntryFunc(dialog, parent, entry, entryType, id));
@@ -630,7 +630,7 @@ Require.modules["app/ui/admin"] = function(exports, require) {
     };
   }
 
-  function newListEntry(parent, entryType, id, text, onclick, templateName) {
+  function newListEntry(parent, entryType, entryName, id, text, onclick, templateName) {
     if (!templateName)
       templateName = "normallistentry";
     var entry = $("#templates ." + templateName).clone();
@@ -644,7 +644,7 @@ Require.modules["app/ui/admin"] = function(exports, require) {
       entrytext.click(onclick);
     entry.hover(function() { $(entry.find(".listentrybutton")).removeClass("nodisplay"); },
                 function() { $(entry.find(".listentrybutton")).addClass("nodisplay"); });
-    $(delbuttondiv.find("button")).click(delEntryDialogFunc(parent, entry, entryType, id));
+    $(delbuttondiv.find("button")).click(delEntryDialogFunc(parent, entry, entryType, entryName, id));
     parent.append(entry);
     return entry;
   }
@@ -674,7 +674,7 @@ Require.modules["app/ui/admin"] = function(exports, require) {
       text = member.nick;
     else
       text = member.name;
-    var entry = newListEntry(parent, "member", member.id, text, null, "memberlistentry");
+    var entry = newListEntry(parent, "member", "member", member.id, text, null, "memberlistentry");
     if (member.site_admin) {
       entry.find(".listentrysiteadminspan").removeClass("nodisplay");
     }
@@ -719,6 +719,7 @@ Require.modules["app/ui/admin"] = function(exports, require) {
     for (var i = 0; i < response.divisions.length; i++) {
       newListEntry($("#admindivisionlist").find(".entitylist"),
                    "division",
+                   "division",
                    response.divisions[i].id,
                    response.divisions[i].name,
                    selectionChangedFunc(response.divisions[i].id));
@@ -749,6 +750,7 @@ Require.modules["app/ui/admin"] = function(exports, require) {
     response.divisions[0].teams.sort(require("app/ui/sort").sortByKey("name"));
     for (var i = 0; i < response.divisions[0].teams.length; i++) {
       newListEntry($("#teams"),
+                   "team",
                    "team",
                    response.divisions[0].teams[i].id,
                    response.divisions[0].teams[i].name,
@@ -795,6 +797,7 @@ Require.modules["app/ui/admin"] = function(exports, require) {
           text += ' / ' + response.teams[0].prodcomps[i].component;
         newListEntry($("#adminteamdetails").find("#prodcomps"),
                      "prodcomp",
+                     "product / component",
                      response.teams[0].prodcomps[i].id,
                      text,
                      null,
