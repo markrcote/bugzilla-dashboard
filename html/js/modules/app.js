@@ -578,7 +578,7 @@ Require.modules["app/ui/admin"] = function(exports, require) {
     return function() {
       var dialog = $("#del-entry");
       $(dialog.find("#del-entry-type")).text(entryType);
-      $(dialog.find("#del-entry-name")).text($(entry.find(".listentrytext")).text());
+      $(dialog.find("#del-entry-name")).text($(entry.find(".listentrytextspan")).text());
       $("#del-entry form").unbind('submit');
       $("#del-entry form").submit(delEntryFunc(dialog, parent, entry, entryType, id));
       dialog.fadeIn(
