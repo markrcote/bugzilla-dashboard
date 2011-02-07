@@ -9,7 +9,7 @@ Require.modules["xhr/queue"] = function(exports, require) {
     this.onWorkerMessage = function(event) {
       var responseType = event.data[0];
       var responseText = event.data[1];
-        
+      
       if (responseType == "load") {
         for (i in this.xhrData.onLoad)
           this.xhrData.onLoad[i](responseText);
@@ -115,7 +115,9 @@ Require.modules["xhr/queue"] = function(exports, require) {
             queue.splice(i, 1);
         }
       } else {
-        workers[tag.workerId].abort(tag.jobId);
+        if (workers[tag.workerId]) {
+          workers[tag.workerId].abort(tag.jobId);
+        }
       }
     };
   }

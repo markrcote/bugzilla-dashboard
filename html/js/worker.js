@@ -20,14 +20,20 @@ function onLoad(event) {
 
 function onError(event) {
   var xhr = event.target;
-  var response = JSON.parse(xhr.responseText);
+  var response = {};
+  if (xhr.responseText) {
+    response = JSON.parse(xhr.responseText);
+  }
   jobId = -1;
   postMessage(["error", response]);
 }
 
 function onAbort(event) {
+  var response = {};
   var xhr = event.target;
-  var response = JSON.parse(xhr.responseText);
+  if (xhr.responseText) {
+    response = JSON.parse(xhr.responseText);
+  }
   jobId = -1;
   postMessage(["abort", response]);
 }

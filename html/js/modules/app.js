@@ -299,8 +299,10 @@ Require.modules["app/ui/find-user"] = function(exports, require) {
     minLength: 2,
     delay: 100,
     source: function(request, response) {
-      if (!require("app/login").get().isAuthenticated)
+      if (!require("app/login").get().isAuthenticated) {
+        response([]);
         return;
+      }
       function success(result) {
         currReq = null;
         var suggs = [];
@@ -313,9 +315,12 @@ Require.modules["app/ui/find-user"] = function(exports, require) {
       }
       if (currReq) {
         xhrQueue.abort(currReq);
+        currReq = null;
       }
-      if (!request.term)
+      if (!request.term) {
         response([]);
+        return;
+      }
       var request = bugzilla.ajax({url: "/user",
                                data: {match: request.term},
                                success: success});
